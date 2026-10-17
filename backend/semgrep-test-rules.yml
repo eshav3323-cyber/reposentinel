@@ -1,0 +1,6 @@
+rules:
+  - id: reposentinel-test-debug-enabled
+    languages: [python]
+    severity: WARNING
+    message: "RepoSentinel test: debug mode is explicitly enabled."
+    pattern: "DEBUG = True"

@@ -1,0 +1,24 @@
+
+rules:
+  - id: reposentinel-debug-enabled
+    languages:
+      - python
+    severity: WARNING
+    message: "Debug mode is explicitly enabled."
+    pattern: DEBUG = True
+
+  - id: reposentinel-tls-verification-disabled
+    languages:
+      - python
+    severity: ERROR
+    message: "TLS certificate verification may be disabled."
+    pattern-either:
+      - pattern: requests.$METHOD(..., verify=False, ...)
+      - pattern: requests.$METHOD(..., verify = False, ...)
+
+  - id: reposentinel-dangerous-eval
+    languages:
+      - python
+    severity: ERROR
+    message: "Use of eval() requires careful security review."
+    pattern: eval(...)

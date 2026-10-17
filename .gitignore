@@ -1,0 +1,24 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+backend/.venv/
+backend/venv/
+
+# Python generated files
+__pycache__/
+*.py[cod]
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Node.js
+node_modules/
+dist/
+
+# IDE and OS files
+.vscode/
+.DS_Store
+Thumbs.db
