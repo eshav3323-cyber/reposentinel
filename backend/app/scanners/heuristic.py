@@ -14,6 +14,7 @@ RULES = [
             r"""(?ix)
             \b(?:password|passwd|client_secret|api_key|access_token)
             \b\s*[:=]\s*
+            (?!\s*(?:os\.environ(?:\.get)?\s*\(|getenv\s*\())
             (?:
                 ["'][^"']{4,}["']
                 |

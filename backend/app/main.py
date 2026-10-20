@@ -1,8 +1,14 @@
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes.scanners import router as scanners_router
 from starlette.types import ASGIApp, Receive, Scope, Send
+
+from app.routes.scanners import router as scanners_router
 from app.routes.scans import router as scans_router
+from app.routes.attack_graph import router as attack_graph_router
+from app.routes.remediation import router as remediation_router
+
 
 MAX_SCAN_REQUEST_BYTES = 21 * 1024 * 1024
 
@@ -100,20 +106,34 @@ class ScanUploadLimitMiddleware:
             "body": body,
         })
 
+
 app = FastAPI(
     title="RepoSentinel Health API",
-    description="Defensive security analysis for healthcare software repositories.",
+    description=(
+        "Defensive security analysis for healthcare software repositories."
+    ),
     version="0.1.0",
 )
+
 app.add_middleware(ScanUploadLimitMiddleware)
+
 app.include_router(scanners_router)
 app.include_router(scans_router)
+app.include_router(attack_graph_router)
+app.include_router(remediation_router)
 
-# Local development only: allow the Vite frontend to communicate
-# with this backend.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        origin.strip()
+        for origin in os.getenv(
+            "CORS_ORIGINS",
+            "http://localhost:5173,http://127.0.0.1:5173,"
+            "http://localhost:4173,http://127.0.0.1:4173",
+        ).split(",")
+        if origin.strip()
+    ],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],
@@ -128,6 +148,11 @@ def root():
         "version": "0.1.0",
         "message": "Healthcare repository security analysis API is ready.",
     }
+
+
+@app.get("/api/status")
+def api_status():
+    return {**root(), "health": health_check()}
 
 
 @app.get("/api/health")

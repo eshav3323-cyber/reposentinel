@@ -1,0 +1,34 @@
+{
+  "dataset_version": "1.0.0",
+  "description": "Harmless synthetic Python repositories for RepoSentinel rule evaluation.",
+  "cases": [
+    {"id":"credential-vulnerable","path":"fixtures/credential/vulnerable","category":"credential","status":"vulnerable","expected_rule_ids":["HEURISTIC-HARDCODED-CREDENTIAL"],"expected_categories":["credential"],"labels":{"credential":true,"debug":false,"tls":false,"sql_concat":false},"limitations":["Fake value only; the pattern does not establish a genuine credential."]},
+    {"id":"credential-fixed","path":"fixtures/credential/fixed","category":"credential","status":"fixed","expected_rule_ids":[],"expected_categories":[],"labels":{"credential":false,"debug":false,"tls":false,"sql_concat":false},"limitations":["The value is read from runtime environment configuration."]},
+    {"id":"debug-vulnerable","path":"fixtures/debug/vulnerable","category":"debug","status":"vulnerable","expected_rule_ids":["HEURISTIC-DEBUG-ENABLED"],"expected_categories":["debug"],"labels":{"credential":false,"debug":true,"tls":false,"sql_concat":false},"limitations":[]},
+    {"id":"debug-fixed","path":"fixtures/debug/fixed","category":"debug","status":"fixed","expected_rule_ids":[],"expected_categories":[],"labels":{"credential":false,"debug":false,"tls":false,"sql_concat":false},"limitations":["Production configuration is represented by a false literal."]},
+    {"id":"tls-vulnerable","path":"fixtures/tls/vulnerable","category":"tls","status":"vulnerable","expected_rule_ids":["HEURISTIC-TLS-VERIFY-DISABLED"],"expected_categories":["tls"],"labels":{"credential":false,"debug":false,"tls":true,"sql_concat":false},"limitations":[]},
+    {"id":"tls-fixed","path":"fixtures/tls/fixed","category":"tls","status":"fixed","expected_rule_ids":[],"expected_categories":[],"labels":{"credential":false,"debug":false,"tls":false,"sql_concat":false},"limitations":["Uses the HTTP client's default verification behavior."]},
+    {"id":"sql-vulnerable","path":"fixtures/sql/vulnerable","category":"sql_concat","status":"vulnerable","expected_rule_ids":["HEURISTIC-SQL-STRING-CONCAT"],"expected_categories":["sql_concat"],"labels":{"credential":false,"debug":false,"tls":false,"sql_concat":true},"limitations":["A text pattern alone does not establish injection or reachability."]},
+    {"id":"sql-fixed","path":"fixtures/sql/fixed","category":"sql_concat","status":"fixed","expected_rule_ids":[],"expected_categories":[],"labels":{"credential":false,"debug":false,"tls":false,"sql_concat":false},"limitations":["Parameterized query behavior is represented syntactically only."]},
+    {"id":"dynamic-vulnerable","path":"fixtures/dynamic/vulnerable","category":"dynamic_code","status":"vulnerable","expected_rule_ids":["reposentinel-dangerous-eval"],"expected_categories":["dynamic_code"],"labels":{"dynamic_code":true},"limitations":["Covered by the local Semgrep rule only when local-tools mode is requested and Semgrep is installed."]},
+    {"id":"dynamic-fixed","path":"fixtures/dynamic/fixed","category":"dynamic_code","status":"fixed","expected_rule_ids":[],"expected_categories":[],"labels":{"dynamic_code":false},"limitations":["AST parsing is safer than evaluation but still requires application-specific validation."]},
+    {"id":"dependency-unverified-declaration","path":"fixtures/dependency/vulnerable","category":"dependency","status":"inconclusive","expected_rule_ids":[],"expected_categories":[],"labels":{"dependency":null},"limitations":["OSV-Scanner is not invoked by the offline runner because the current integration does not guarantee an offline vulnerability database. This version declaration is not labeled vulnerable without advisory evidence."]},
+    {"id":"dependency-removed","path":"fixtures/dependency/fixed","category":"dependency","status":"inconclusive","expected_rule_ids":[],"expected_categories":[],"labels":{"dependency":null},"limitations":["No advisory or fixed version is asserted; this case is not scored offline."]},
+    {"id":"benign-patterns","path":"fixtures/benign","category":"benign","status":"negative","expected_rule_ids":[],"expected_categories":[],"labels":{"credential":false,"debug":false,"tls":false,"sql_concat":false},"limitations":["One small negative sample cannot estimate real-world false-positive rates."]}
+  ],
+  "pairs": [
+    {"category":"credential","vulnerable":"credential-vulnerable","fixed":"credential-fixed","required_scanner":"heuristic"},
+    {"category":"debug","vulnerable":"debug-vulnerable","fixed":"debug-fixed","required_scanner":"heuristic"},
+    {"category":"tls","vulnerable":"tls-vulnerable","fixed":"tls-fixed","required_scanner":"heuristic"},
+    {"category":"sql_concat","vulnerable":"sql-vulnerable","fixed":"sql-fixed","required_scanner":"heuristic"},
+    {"category":"dynamic_code","vulnerable":"dynamic-vulnerable","fixed":"dynamic-fixed","required_scanner":"semgrep"}
+  ],
+  "category_rule_ids": {
+    "credential":["HEURISTIC-HARDCODED-CREDENTIAL"],
+    "debug":["HEURISTIC-DEBUG-ENABLED","reposentinel-debug-enabled"],
+    "tls":["HEURISTIC-TLS-VERIFY-DISABLED","reposentinel-tls-verification-disabled"],
+    "sql_concat":["HEURISTIC-SQL-STRING-CONCAT"],
+    "dynamic_code":["reposentinel-dangerous-eval"],
+    "dependency":[]
+  }
+}

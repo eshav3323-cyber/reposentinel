@@ -3,12 +3,15 @@ import json
 import shutil
 import subprocess
 import tempfile
+from functools import lru_cache
+from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path, PurePosixPath
 import sys
 
 from app.core.archive_handler import SourceFile
 from app.core.finding_normalizer import normalize_finding
 from app.models.findings import Finding
+import yaml
 
 
 class SemgrepScanError(RuntimeError):
@@ -16,6 +19,48 @@ class SemgrepScanError(RuntimeError):
 
 
 RULES_PATH = Path(__file__).with_name("semgrep_rules.yml")
+
+
+def _semgrep_command(executable: str) -> list[str]:
+    """Prefer the installed Semgrep package entry point in this interpreter.
+
+    On Windows, a console-script launcher can be bound to a different Python
+    environment than the backend and fail while importing its dependencies.
+    Using the package entry point keeps Semgrep and its dependencies together.
+    """
+    try:
+        distribution("semgrep")
+    except PackageNotFoundError:
+        return [executable]
+    return [
+        sys.executable,
+        "-c",
+        "from semgrep.console_scripts.entrypoint import main; main()",
+        "--legacy",
+    ]
+
+
+@lru_cache(maxsize=1)
+def _configured_rule_ids() -> frozenset[str]:
+    """Return rule IDs declared by the local config for output normalization."""
+    try:
+        config = yaml.safe_load(RULES_PATH.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, yaml.YAMLError):
+        return frozenset()
+    rules = config.get("rules", []) if isinstance(config, dict) else []
+    return frozenset(
+        rule["id"] for rule in rules
+        if isinstance(rule, dict) and isinstance(rule.get("id"), str)
+    )
+
+
+def _normalize_rule_id(rule_id: str) -> str:
+    """Remove Semgrep's config namespace only for a declared local rule ID."""
+    configured_ids = _configured_rule_ids()
+    for configured_id in configured_ids:
+        if rule_id == configured_id or rule_id.endswith(f".{configured_id}"):
+            return configured_id
+    return rule_id
 
 
 def scan_with_semgrep(
@@ -75,7 +120,7 @@ def scan_with_semgrep(
                 )
 
             command = [
-                executable,
+                *_semgrep_command(executable),
                 "scan",
                 "--config",
                 str(RULES_PATH),
@@ -92,6 +137,8 @@ def scan_with_semgrep(
                     command,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=timeout_seconds,
                     check=False,
                     shell=False,
@@ -190,8 +237,9 @@ def scan_with_semgrep(
                                 or "Potential code security issue"
                             ),
                             "rule_id": str(
-                                item.get("check_id")
-                                or "SEMGREP-UNSPECIFIED"
+                                _normalize_rule_id(
+                                    str(item.get("check_id") or "SEMGREP-UNSPECIFIED")
+                                )
                             ),
                             "severity": severity_map.get(
                                 raw_severity, "medium"

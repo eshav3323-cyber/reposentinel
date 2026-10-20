@@ -1,0 +1,1110 @@
+{
+  "cases": [
+    {
+      "case_id": "credential-vulnerable",
+      "category": "credential",
+      "check_status": "evaluated",
+      "detected_categories": [
+        "credential"
+      ],
+      "detected_rule_ids": [
+        "HEURISTIC-HARDCODED-CREDENTIAL"
+      ],
+      "evaluated_label_categories": [
+        "credential",
+        "debug",
+        "sql_concat",
+        "tls"
+      ],
+      "expected_categories": [
+        "credential"
+      ],
+      "expected_categories_match": true,
+      "expected_rule_ids": [
+        "HEURISTIC-HARDCODED-CREDENTIAL"
+      ],
+      "expected_rule_ids_match": true,
+      "files": [
+        "config.py"
+      ],
+      "findings": [
+        {
+          "file_path": "config.py",
+          "rule_id": "HEURISTIC-HARDCODED-CREDENTIAL",
+          "source_scanner": "RepoSentinel Heuristic"
+        }
+      ],
+      "ground_truth_labels": {
+        "credential": true,
+        "debug": false,
+        "sql_concat": false,
+        "tls": false
+      },
+      "limitations": [
+        "Fake value only; the pattern does not establish a genuine credential."
+      ],
+      "status": "vulnerable",
+      "unit_rule_ids": [
+        "HEURISTIC-HARDCODED-CREDENTIAL"
+      ]
+    },
+    {
+      "case_id": "credential-fixed",
+      "category": "credential",
+      "check_status": "evaluated",
+      "detected_categories": [],
+      "detected_rule_ids": [],
+      "evaluated_label_categories": [
+        "credential",
+        "debug",
+        "sql_concat",
+        "tls"
+      ],
+      "expected_categories": [],
+      "expected_categories_match": true,
+      "expected_rule_ids": [],
+      "expected_rule_ids_match": null,
+      "files": [
+        "config.py"
+      ],
+      "findings": [],
+      "ground_truth_labels": {
+        "credential": false,
+        "debug": false,
+        "sql_concat": false,
+        "tls": false
+      },
+      "limitations": [
+        "The value is read from runtime environment configuration."
+      ],
+      "status": "fixed",
+      "unit_rule_ids": []
+    },
+    {
+      "case_id": "debug-vulnerable",
+      "category": "debug",
+      "check_status": "evaluated",
+      "detected_categories": [
+        "debug"
+      ],
+      "detected_rule_ids": [
+        "HEURISTIC-DEBUG-ENABLED",
+        "reposentinel-debug-enabled"
+      ],
+      "evaluated_label_categories": [
+        "credential",
+        "debug",
+        "sql_concat",
+        "tls"
+      ],
+      "expected_categories": [
+        "debug"
+      ],
+      "expected_categories_match": true,
+      "expected_rule_ids": [
+        "HEURISTIC-DEBUG-ENABLED"
+      ],
+      "expected_rule_ids_match": true,
+      "files": [
+        "settings.py"
+      ],
+      "findings": [
+        {
+          "file_path": "settings.py",
+          "rule_id": "HEURISTIC-DEBUG-ENABLED",
+          "source_scanner": "RepoSentinel Heuristic"
+        },
+        {
+          "file_path": "settings.py",
+          "rule_id": "reposentinel-debug-enabled",
+          "source_scanner": "Semgrep"
+        }
+      ],
+      "ground_truth_labels": {
+        "credential": false,
+        "debug": true,
+        "sql_concat": false,
+        "tls": false
+      },
+      "limitations": [],
+      "status": "vulnerable",
+      "unit_rule_ids": [
+        "HEURISTIC-DEBUG-ENABLED"
+      ]
+    },
+    {
+      "case_id": "debug-fixed",
+      "category": "debug",
+      "check_status": "evaluated",
+      "detected_categories": [],
+      "detected_rule_ids": [],
+      "evaluated_label_categories": [
+        "credential",
+        "debug",
+        "sql_concat",
+        "tls"
+      ],
+      "expected_categories": [],
+      "expected_categories_match": true,
+      "expected_rule_ids": [],
+      "expected_rule_ids_match": null,
+      "files": [
+        "settings.py"
+      ],
+      "findings": [],
+      "ground_truth_labels": {
+        "credential": false,
+        "debug": false,
+        "sql_concat": false,
+        "tls": false
+      },
+      "limitations": [
+        "Production configuration is represented by a false literal."
+      ],
+      "status": "fixed",
+      "unit_rule_ids": []
+    },
+    {
+      "case_id": "tls-vulnerable",
+      "category": "tls",
+      "check_status": "evaluated",
+      "detected_categories": [
+        "tls"
+      ],
+      "detected_rule_ids": [
+        "HEURISTIC-TLS-VERIFY-DISABLED",
+        "reposentinel-tls-verification-disabled"
+      ],
+      "evaluated_label_categories": [
+        "credential",
+        "debug",
+        "sql_concat",
+        "tls"
+      ],
+      "expected_categories": [
+        "tls"
+      ],
+      "expected_categories_match": true,
+      "expected_rule_ids": [
+        "HEURISTIC-TLS-VERIFY-DISABLED"
+      ],
+      "expected_rule_ids_match": true,
+      "files": [
+        "client.py"
+      ],
+      "findings": [
+        {
+          "file_path": "client.py",
+          "rule_id": "HEURISTIC-TLS-VERIFY-DISABLED",
+          "source_scanner": "RepoSentinel Heuristic"
+        },
+        {
+          "file_path": "client.py",
+          "rule_id": "reposentinel-tls-verification-disabled",
+          "source_scanner": "Semgrep"
+        }
+      ],
+      "ground_truth_labels": {
+        "credential": false,
+        "debug": false,
+        "sql_concat": false,
+        "tls": true
+      },
+      "limitations": [],
+      "status": "vulnerable",
+      "unit_rule_ids": [
+        "HEURISTIC-TLS-VERIFY-DISABLED"
+      ]
+    },
+    {
+      "case_id": "tls-fixed",
+      "category": "tls",
+      "check_status": "evaluated",
+      "detected_categories": [],
+      "detected_rule_ids": [],
+      "evaluated_label_categories": [
+        "credential",
+        "debug",
+        "sql_concat",
+        "tls"
+      ],
+      "expected_categories": [],
+      "expected_categories_match": true,
+      "expected_rule_ids": [],
+      "expected_rule_ids_match": null,
+      "files": [
+        "client.py"
+      ],
+      "findings": [],
+      "ground_truth_labels": {
+        "credential": false,
+        "debug": false,
+        "sql_concat": false,
+        "tls": false
+      },
+      "limitations": [
+        "Uses the HTTP client's default verification behavior."
+      ],
+      "status": "fixed",
+      "unit_rule_ids": []
+    },
+    {
+      "case_id": "sql-vulnerable",
+      "category": "sql_concat",
+      "check_status": "evaluated",
+      "detected_categories": [
+        "sql_concat"
+      ],
+      "detected_rule_ids": [
+        "HEURISTIC-SQL-STRING-CONCAT"
+      ],
+      "evaluated_label_categories": [
+        "credential",
+        "debug",
+        "sql_concat",
+        "tls"
+      ],
+      "expected_categories": [
+        "sql_concat"
+      ],
+      "expected_categories_match": true,
+      "expected_rule_ids": [
+        "HEURISTIC-SQL-STRING-CONCAT"
+      ],
+      "expected_rule_ids_match": true,
+      "files": [
+        "records.py"
+      ],
+      "findings": [
+        {
+          "file_path": "records.py",
+          "rule_id": "HEURISTIC-SQL-STRING-CONCAT",
+          "source_scanner": "RepoSentinel Heuristic"
+        }
+      ],
+      "ground_truth_labels": {
+        "credential": false,
+        "debug": false,
+        "sql_concat": true,
+        "tls": false
+      },
+      "limitations": [
+        "A text pattern alone does not establish injection or reachability."
+      ],
+      "status": "vulnerable",
+      "unit_rule_ids": [
+        "HEURISTIC-SQL-STRING-CONCAT"
+      ]
+    },
+    {
+      "case_id": "sql-fixed",
+      "category": "sql_concat",
+      "check_status": "evaluated",
+      "detected_categories": [],
+      "detected_rule_ids": [],
+      "evaluated_label_categories": [
+        "credential",
+        "debug",
+        "sql_concat",
+        "tls"
+      ],
+      "expected_categories": [],
+      "expected_categories_match": true,
+      "expected_rule_ids": [],
+      "expected_rule_ids_match": null,
+      "files": [
+        "records.py"
+      ],
+      "findings": [],
+      "ground_truth_labels": {
+        "credential": false,
+        "debug": false,
+        "sql_concat": false,
+        "tls": false
+      },
+      "limitations": [
+        "Parameterized query behavior is represented syntactically only."
+      ],
+      "status": "fixed",
+      "unit_rule_ids": []
+    },
+    {
+      "case_id": "dynamic-vulnerable",
+      "category": "dynamic_code",
+      "check_status": "evaluated",
+      "detected_categories": [
+        "dynamic_code"
+      ],
+      "detected_rule_ids": [
+        "reposentinel-dangerous-eval"
+      ],
+      "evaluated_label_categories": [
+        "dynamic_code"
+      ],
+      "expected_categories": [
+        "dynamic_code"
+      ],
+      "expected_categories_match": true,
+      "expected_rule_ids": [
+        "reposentinel-dangerous-eval"
+      ],
+      "expected_rule_ids_match": true,
+      "files": [
+        "parser.py"
+      ],
+      "findings": [
+        {
+          "file_path": "parser.py",
+          "rule_id": "reposentinel-dangerous-eval",
+          "source_scanner": "Semgrep"
+        }
+      ],
+      "ground_truth_labels": {
+        "dynamic_code": true
+      },
+      "limitations": [
+        "Covered by the local Semgrep rule only when local-tools mode is requested and Semgrep is installed."
+      ],
+      "status": "vulnerable",
+      "unit_rule_ids": []
+    },
+    {
+      "case_id": "dynamic-fixed",
+      "category": "dynamic_code",
+      "check_status": "evaluated",
+      "detected_categories": [],
+      "detected_rule_ids": [],
+      "evaluated_label_categories": [
+        "dynamic_code"
+      ],
+      "expected_categories": [],
+      "expected_categories_match": true,
+      "expected_rule_ids": [],
+      "expected_rule_ids_match": null,
+      "files": [
+        "parser.py"
+      ],
+      "findings": [],
+      "ground_truth_labels": {
+        "dynamic_code": false
+      },
+      "limitations": [
+        "AST parsing is safer than evaluation but still requires application-specific validation."
+      ],
+      "status": "fixed",
+      "unit_rule_ids": []
+    },
+    {
+      "case_id": "dependency-unverified-declaration",
+      "category": "dependency",
+      "check_status": "not_evaluated",
+      "detected_categories": [],
+      "detected_rule_ids": [],
+      "evaluated_label_categories": [],
+      "expected_categories": [],
+      "expected_categories_match": null,
+      "expected_rule_ids": [],
+      "expected_rule_ids_match": null,
+      "files": [
+        "requirements.txt"
+      ],
+      "findings": [],
+      "ground_truth_labels": {
+        "dependency": null
+      },
+      "limitations": [
+        "OSV-Scanner is not invoked by the offline runner because the current integration does not guarantee an offline vulnerability database. This version declaration is not labeled vulnerable without advisory evidence."
+      ],
+      "status": "inconclusive",
+      "unit_rule_ids": []
+    },
+    {
+      "case_id": "dependency-removed",
+      "category": "dependency",
+      "check_status": "not_evaluated",
+      "detected_categories": [],
+      "detected_rule_ids": [],
+      "evaluated_label_categories": [],
+      "expected_categories": [],
+      "expected_categories_match": null,
+      "expected_rule_ids": [],
+      "expected_rule_ids_match": null,
+      "files": [
+        "requirements.txt"
+      ],
+      "findings": [],
+      "ground_truth_labels": {
+        "dependency": null
+      },
+      "limitations": [
+        "No advisory or fixed version is asserted; this case is not scored offline."
+      ],
+      "status": "inconclusive",
+      "unit_rule_ids": []
+    },
+    {
+      "case_id": "benign-patterns",
+      "category": "benign",
+      "check_status": "evaluated",
+      "detected_categories": [],
+      "detected_rule_ids": [],
+      "evaluated_label_categories": [
+        "credential",
+        "debug",
+        "sql_concat",
+        "tls"
+      ],
+      "expected_categories": [],
+      "expected_categories_match": true,
+      "expected_rule_ids": [],
+      "expected_rule_ids_match": null,
+      "files": [
+        "examples.py"
+      ],
+      "findings": [],
+      "ground_truth_labels": {
+        "credential": false,
+        "debug": false,
+        "sql_concat": false,
+        "tls": false
+      },
+      "limitations": [
+        "One small negative sample cannot estimate real-world false-positive rates."
+      ],
+      "status": "negative",
+      "unit_rule_ids": []
+    }
+  ],
+  "dataset_version": "1.0.0",
+  "evaluated_categories": [
+    "credential",
+    "debug",
+    "dynamic_code",
+    "sql_concat",
+    "tls"
+  ],
+  "evaluation_version": "1.0.0",
+  "full_pipeline_metrics": {
+    "overall": {
+      "cases": 38,
+      "denominators": {
+        "f1_precision": 5,
+        "f1_recall": 5,
+        "false_positive_rate": 33,
+        "precision": 5,
+        "recall": 5
+      },
+      "excluded_cases": 2,
+      "f1": 1.0,
+      "false_negatives": 0,
+      "false_positive_rate": 0.0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_negatives": 33,
+      "true_positives": 5
+    },
+    "per_category": {
+      "credential": {
+        "cases": 9,
+        "denominators": {
+          "f1_precision": 1,
+          "f1_recall": 1,
+          "false_positive_rate": 8,
+          "precision": 1,
+          "recall": 1
+        },
+        "excluded_cases": 0,
+        "f1": 1.0,
+        "false_negatives": 0,
+        "false_positive_rate": 0.0,
+        "false_positives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "true_negatives": 8,
+        "true_positives": 1
+      },
+      "debug": {
+        "cases": 9,
+        "denominators": {
+          "f1_precision": 1,
+          "f1_recall": 1,
+          "false_positive_rate": 8,
+          "precision": 1,
+          "recall": 1
+        },
+        "excluded_cases": 0,
+        "f1": 1.0,
+        "false_negatives": 0,
+        "false_positive_rate": 0.0,
+        "false_positives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "true_negatives": 8,
+        "true_positives": 1
+      },
+      "dynamic_code": {
+        "cases": 2,
+        "denominators": {
+          "f1_precision": 1,
+          "f1_recall": 1,
+          "false_positive_rate": 1,
+          "precision": 1,
+          "recall": 1
+        },
+        "excluded_cases": 0,
+        "f1": 1.0,
+        "false_negatives": 0,
+        "false_positive_rate": 0.0,
+        "false_positives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "true_negatives": 1,
+        "true_positives": 1
+      },
+      "sql_concat": {
+        "cases": 9,
+        "denominators": {
+          "f1_precision": 1,
+          "f1_recall": 1,
+          "false_positive_rate": 8,
+          "precision": 1,
+          "recall": 1
+        },
+        "excluded_cases": 0,
+        "f1": 1.0,
+        "false_negatives": 0,
+        "false_positive_rate": 0.0,
+        "false_positives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "true_negatives": 8,
+        "true_positives": 1
+      },
+      "tls": {
+        "cases": 9,
+        "denominators": {
+          "f1_precision": 1,
+          "f1_recall": 1,
+          "false_positive_rate": 8,
+          "precision": 1,
+          "recall": 1
+        },
+        "excluded_cases": 0,
+        "f1": 1.0,
+        "false_negatives": 0,
+        "false_positive_rate": 0.0,
+        "false_positives": 0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "true_negatives": 8,
+        "true_positives": 1
+      }
+    }
+  },
+  "limitations": [
+    "A small synthetic dataset does not establish production security effectiveness.",
+    "Code fixtures are scanned as text and never executed.",
+    "OSV dependency findings are not scored because the current integration does not guarantee offline operation.",
+    "Precision, recall, F1, and false-positive rate describe this fixture set only; undefined denominators are null."
+  ],
+  "matching": "Exact rule-ID mapping to explicit categories; Gitleaks source maps to credential, OSV-Scanner source maps to dependency. Each metric observation is one fixture/category pair. Only boolean ground truth with a successful supporting scanner is included; inconclusive labels and unsupported/failed scanner categories are excluded.",
+  "metric_observations": [
+    {
+      "case_id": "credential-vulnerable",
+      "category": "credential",
+      "exclusion_reason": null,
+      "ground_truth": true,
+      "included": true,
+      "predicted": true
+    },
+    {
+      "case_id": "credential-vulnerable",
+      "category": "debug",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "credential-vulnerable",
+      "category": "tls",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "credential-vulnerable",
+      "category": "sql_concat",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "credential-fixed",
+      "category": "credential",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "credential-fixed",
+      "category": "debug",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "credential-fixed",
+      "category": "tls",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "credential-fixed",
+      "category": "sql_concat",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "debug-vulnerable",
+      "category": "credential",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "debug-vulnerable",
+      "category": "debug",
+      "exclusion_reason": null,
+      "ground_truth": true,
+      "included": true,
+      "predicted": true
+    },
+    {
+      "case_id": "debug-vulnerable",
+      "category": "tls",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "debug-vulnerable",
+      "category": "sql_concat",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "debug-fixed",
+      "category": "credential",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "debug-fixed",
+      "category": "debug",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "debug-fixed",
+      "category": "tls",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "debug-fixed",
+      "category": "sql_concat",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "tls-vulnerable",
+      "category": "credential",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "tls-vulnerable",
+      "category": "debug",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "tls-vulnerable",
+      "category": "tls",
+      "exclusion_reason": null,
+      "ground_truth": true,
+      "included": true,
+      "predicted": true
+    },
+    {
+      "case_id": "tls-vulnerable",
+      "category": "sql_concat",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "tls-fixed",
+      "category": "credential",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "tls-fixed",
+      "category": "debug",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "tls-fixed",
+      "category": "tls",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "tls-fixed",
+      "category": "sql_concat",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "sql-vulnerable",
+      "category": "credential",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "sql-vulnerable",
+      "category": "debug",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "sql-vulnerable",
+      "category": "tls",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "sql-vulnerable",
+      "category": "sql_concat",
+      "exclusion_reason": null,
+      "ground_truth": true,
+      "included": true,
+      "predicted": true
+    },
+    {
+      "case_id": "sql-fixed",
+      "category": "credential",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "sql-fixed",
+      "category": "debug",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "sql-fixed",
+      "category": "tls",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "sql-fixed",
+      "category": "sql_concat",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "dynamic-vulnerable",
+      "category": "dynamic_code",
+      "exclusion_reason": null,
+      "ground_truth": true,
+      "included": true,
+      "predicted": true
+    },
+    {
+      "case_id": "dynamic-fixed",
+      "category": "dynamic_code",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "dependency-unverified-declaration",
+      "category": "dependency",
+      "exclusion_reason": "Ground truth is inconclusive for this category.",
+      "ground_truth": null,
+      "included": false,
+      "predicted": null
+    },
+    {
+      "case_id": "dependency-removed",
+      "category": "dependency",
+      "exclusion_reason": "Ground truth is inconclusive for this category.",
+      "ground_truth": null,
+      "included": false,
+      "predicted": null
+    },
+    {
+      "case_id": "benign-patterns",
+      "category": "credential",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "benign-patterns",
+      "category": "debug",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "benign-patterns",
+      "category": "tls",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    },
+    {
+      "case_id": "benign-patterns",
+      "category": "sql_concat",
+      "exclusion_reason": null,
+      "ground_truth": false,
+      "included": true,
+      "predicted": false
+    }
+  ],
+  "mode": "local-tools",
+  "not_evaluated_categories": {
+    "dependency": {
+      "reason": "No successful scanner supports this category.",
+      "supporting_scanners": {
+        "osv": "skipped"
+      }
+    }
+  },
+  "required_case_failures": [],
+  "required_pair_failures": [],
+  "scanner_errors": [],
+  "scanner_status": {
+    "gitleaks": {
+      "availability": "installed",
+      "reason": "Found local executable; no installation or download attempted.",
+      "status": "completed"
+    },
+    "heuristic": {
+      "availability": "built_in",
+      "reason": "Built-in scanner; always run.",
+      "status": "completed"
+    },
+    "osv": {
+      "availability": "offline_unsupported",
+      "reason": "The existing OSV integration has no guaranteed offline database mode; network access is not used by this evaluation.",
+      "status": "skipped"
+    },
+    "semgrep": {
+      "availability": "installed",
+      "reason": "Found local executable; no installation or download attempted.",
+      "status": "completed"
+    }
+  },
+  "unit_rule_metrics": {
+    "credential": {
+      "cases": 9,
+      "denominators": {
+        "f1_precision": 1,
+        "f1_recall": 1,
+        "false_positive_rate": 8,
+        "precision": 1,
+        "recall": 1
+      },
+      "excluded_cases": 4,
+      "f1": 1.0,
+      "false_negatives": 0,
+      "false_positive_rate": 0.0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "rule_ids": [
+        "HEURISTIC-HARDCODED-CREDENTIAL"
+      ],
+      "true_negatives": 8,
+      "true_positives": 1
+    },
+    "debug": {
+      "cases": 9,
+      "denominators": {
+        "f1_precision": 1,
+        "f1_recall": 1,
+        "false_positive_rate": 8,
+        "precision": 1,
+        "recall": 1
+      },
+      "excluded_cases": 4,
+      "f1": 1.0,
+      "false_negatives": 0,
+      "false_positive_rate": 0.0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "rule_ids": [
+        "HEURISTIC-DEBUG-ENABLED"
+      ],
+      "true_negatives": 8,
+      "true_positives": 1
+    },
+    "sql_concat": {
+      "cases": 9,
+      "denominators": {
+        "f1_precision": 1,
+        "f1_recall": 1,
+        "false_positive_rate": 8,
+        "precision": 1,
+        "recall": 1
+      },
+      "excluded_cases": 4,
+      "f1": 1.0,
+      "false_negatives": 0,
+      "false_positive_rate": 0.0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "rule_ids": [
+        "HEURISTIC-SQL-STRING-CONCAT"
+      ],
+      "true_negatives": 8,
+      "true_positives": 1
+    },
+    "tls": {
+      "cases": 9,
+      "denominators": {
+        "f1_precision": 1,
+        "f1_recall": 1,
+        "false_positive_rate": 8,
+        "precision": 1,
+        "recall": 1
+      },
+      "excluded_cases": 4,
+      "f1": 1.0,
+      "false_negatives": 0,
+      "false_positive_rate": 0.0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "rule_ids": [
+        "HEURISTIC-TLS-VERIFY-DISABLED"
+      ],
+      "true_negatives": 8,
+      "true_positives": 1
+    }
+  },
+  "vulnerable_fixed_pairs": [
+    {
+      "category": "credential",
+      "fixed_case": "credential-fixed",
+      "fixed_target_absent": true,
+      "remaining_fixed_findings": [],
+      "status": "passed",
+      "unexpected_vulnerable_findings": [],
+      "vulnerable_case": "credential-vulnerable",
+      "vulnerable_target_detected": true
+    },
+    {
+      "category": "debug",
+      "fixed_case": "debug-fixed",
+      "fixed_target_absent": true,
+      "remaining_fixed_findings": [],
+      "status": "passed",
+      "unexpected_vulnerable_findings": [],
+      "vulnerable_case": "debug-vulnerable",
+      "vulnerable_target_detected": true
+    },
+    {
+      "category": "tls",
+      "fixed_case": "tls-fixed",
+      "fixed_target_absent": true,
+      "remaining_fixed_findings": [],
+      "status": "passed",
+      "unexpected_vulnerable_findings": [],
+      "vulnerable_case": "tls-vulnerable",
+      "vulnerable_target_detected": true
+    },
+    {
+      "category": "sql_concat",
+      "fixed_case": "sql-fixed",
+      "fixed_target_absent": true,
+      "remaining_fixed_findings": [],
+      "status": "passed",
+      "unexpected_vulnerable_findings": [],
+      "vulnerable_case": "sql-vulnerable",
+      "vulnerable_target_detected": true
+    },
+    {
+      "category": "dynamic_code",
+      "fixed_case": "dynamic-fixed",
+      "fixed_target_absent": true,
+      "remaining_fixed_findings": [],
+      "status": "passed",
+      "unexpected_vulnerable_findings": [],
+      "vulnerable_case": "dynamic-vulnerable",
+      "vulnerable_target_detected": true
+    }
+  ]
+}

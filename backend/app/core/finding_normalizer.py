@@ -22,13 +22,23 @@ SECRET_VALUE_PATTERN = re.compile(
 BEARER_PATTERN = re.compile(
     r"(?i)\b(Bearer)\s+[A-Za-z0-9._~+/=-]+"
 )
+PRIVATE_KEY_PATTERN = re.compile(
+    r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----.*?"
+    r"-----END [A-Z0-9 ]*PRIVATE KEY-----",
+    re.IGNORECASE | re.DOTALL,
+)
+TOKEN_PATTERN = re.compile(r"\b(?:gh[pousr]_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16})\b")
+SYNTHETIC_CREDENTIAL_PATTERN = re.compile(r"\b(?:DEMO|SYNTH)_[A-Z0-9_]{8,}\b")
 
 
 def redact_evidence(text: str) -> str:
     """Redact likely credential values before storing evidence."""
 
+    text = PRIVATE_KEY_PATTERN.sub("[REDACTED PRIVATE KEY]", text)
     text = SECRET_VALUE_PATTERN.sub(r"\1[REDACTED]", text)
     text = BEARER_PATTERN.sub(r"\1 [REDACTED]", text)
+    text = TOKEN_PATTERN.sub("[REDACTED TOKEN]", text)
+    text = SYNTHETIC_CREDENTIAL_PATTERN.sub("[REDACTED SYNTHETIC CREDENTIAL]", text)
 
     return text[:500]
 
@@ -59,12 +69,18 @@ def normalize_finding(
         "low": "low",
     }
 
-    title = str(raw.get("title") or "Unspecified security finding")
-    rule_id = str(raw.get("rule_id") or "UNSPECIFIED")
-    file_path = str(raw.get("file_path") or "unknown")
-    description = str(raw.get("description") or "No description provided.")
+    title = redact_evidence(
+        str(raw.get("title") or "Unspecified security finding")
+    )[:240]
+    rule_id = redact_evidence(str(raw.get("rule_id") or "UNSPECIFIED"))
+    file_path = redact_evidence(str(raw.get("file_path") or "unknown"))
+    description = redact_evidence(
+        str(raw.get("description") or "No description provided.")
+    )
     evidence = redact_evidence(str(raw.get("evidence") or ""))
-    remediation = str(raw.get("remediation") or "Review the finding manually.")
+    remediation = redact_evidence(
+        str(raw.get("remediation") or "Review the finding manually.")
+    )
 
     try:
         line_number = max(1, int(raw.get("line_number") or 1))

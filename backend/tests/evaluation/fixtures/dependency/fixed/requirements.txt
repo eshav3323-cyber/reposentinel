@@ -1,0 +1,1 @@
+# Dependency removed from this synthetic repository; no replacement version is asserted.

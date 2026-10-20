@@ -1,9 +1,11 @@
 
+import asyncio
+from time import perf_counter
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.archive_handler import (
     ArchiveValidationError,
@@ -23,11 +25,13 @@ from app.scanners.osv_scanner import (
     OsvScanError,
     scan_with_osv,
 )
+from app.models.findings import Finding
 
 router = APIRouter(prefix="/api/scans", tags=["Scans"])
 
 # Temporary in-memory storage; results disappear on backend restart.
 SCAN_STORE: dict[str, dict] = {}
+MAX_STORED_SCANS = 50
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 
@@ -47,6 +51,7 @@ class ScannerStatus(BaseModel):
     findings: int
     error: str | None = None
     unique_findings: int = 0
+    duration_ms: int = 0
 
 
 class ScanResponse(BaseModel):
@@ -56,6 +61,8 @@ class ScanResponse(BaseModel):
     created_at: str
     summary: ScanSummary
     scanner_status: dict[str, ScannerStatus]
+    duration_ms: int = 0
+    findings: list[Finding] = Field(default_factory=list)
     message: str
 
 
@@ -139,6 +146,7 @@ def count_unique_by_scanner(findings: list) -> dict[str, int]:
 
 @router.post("", response_model=ScanResponse)
 async def scan_repository(file: UploadFile = File(...)):
+    scan_started = perf_counter()
     filename = file.filename or ""
 
     if not filename.lower().endswith(".zip"):
@@ -166,63 +174,59 @@ async def scan_repository(file: UploadFile = File(...)):
         )
 
     try:
-        source_files = read_repository_zip(archive_bytes)
+        source_files = await asyncio.to_thread(read_repository_zip, archive_bytes)
     except ArchiveValidationError as exc:
         raise HTTPException(
             status_code=400,
             detail=str(exc),
         ) from exc
 
-    all_findings = []
-    scanner_status = {}
-
-    # Heuristic scanner
-    try:
-        results = scan_source_files(source_files)
-        all_findings.extend(results)
-
-        scanner_status["heuristic"] = {
-            "status": "completed",
-            "findings": len(results),
-            "error": None,
-        }
-    except Exception:
-        # Unexpected errors are recorded without exposing internal details.
-        scanner_status["heuristic"] = {
-            "status": "failed",
-            "findings": 0,
-            "error": "Heuristic scanning failed unexpectedly.",
-        }
-
-    # External scanner integrations
+    # Scanner subprocesses can take seconds. Run them on worker threads so
+    # health checks and separate uploads remain responsive, and concurrently
+    # so end-to-end latency is close to the slowest scanner rather than their sum.
     scanners = [
+        ("heuristic", scan_source_files, None),
         ("gitleaks", scan_with_gitleaks, GitleaksScanError),
         ("semgrep", scan_with_semgrep, SemgrepScanError),
         ("osv", scan_with_osv, OsvScanError),
     ]
 
-    for name, scan_function, expected_error in scanners:
+    async def run_scanner(name, scan_function, expected_error):
+        started = perf_counter()
         try:
-            results = scan_function(source_files)
-            all_findings.extend(results)
-
-            scanner_status[name] = {
+            results = await asyncio.to_thread(scan_function, source_files)
+            status = {
                 "status": "completed",
                 "findings": len(results),
                 "error": None,
+                "duration_ms": round((perf_counter() - started) * 1000),
             }
-        except expected_error:
-            scanner_status[name] = {
+            return name, results, status
+        except Exception as exc:
+            known_failure = (
+                expected_error is not None
+                and isinstance(exc, expected_error)
+            )
+            return name, [], {
                 "status": "failed",
                 "findings": 0,
-                "error": f"{name} could not complete the scan.",
+                "error": (
+                    f"{name} could not complete the scan."
+                    if known_failure
+                    else f"{name} encountered an unexpected error."
+                ),
+                "duration_ms": round((perf_counter() - started) * 1000),
             }
-        except Exception:
-            scanner_status[name] = {
-                "status": "failed",
-                "findings": 0,
-                "error": f"{name} encountered an unexpected error.",
-            }
+
+    outcomes = await asyncio.gather(*(
+        run_scanner(name, scan_function, expected_error)
+        for name, scan_function, expected_error in scanners
+    ))
+    all_findings = []
+    scanner_status = {}
+    for name, results, status in outcomes:
+        all_findings.extend(results)
+        scanner_status[name] = status
 
     findings = deduplicate_findings(all_findings)
 
@@ -261,17 +265,16 @@ async def scan_repository(file: UploadFile = File(...)):
         "created_at": created_at,
         "summary": summary,
         "scanner_status": scanner_status,
+        "duration_ms": round((perf_counter() - scan_started) * 1000),
         "findings": [finding.model_dump() for finding in findings],
         "message": message,
     }
 
     SCAN_STORE[scan_id] = result
+    while len(SCAN_STORE) > MAX_STORED_SCANS:
+        SCAN_STORE.pop(next(iter(SCAN_STORE)))
 
-    return {
-        key: value
-        for key, value in result.items()
-        if key != "findings"
-    }
+    return result
 
 
 @router.get("/{scan_id}")
