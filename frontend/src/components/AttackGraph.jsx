@@ -1,8 +1,11 @@
 ﻿import { useMemo, useState } from "react";
 import {
   Background,
+  BaseEdge,
   Controls,
-  MiniMap,
+  EdgeLabelRenderer,
+  getBezierPath,
+  MarkerType,
   ReactFlow,
   Handle,
   Position,
@@ -57,7 +60,9 @@ function GraphNode({ data, selected }) {
         "--node-color": nodeColor,
         "--risk-color": riskColor,
       }}
-      title={data.description || data.label}
+      tabIndex={0}
+      role="group"
+      aria-label={`${formatLabel(data.nodeType)}: ${data.label}. ${formatLabel(data.riskLevel)} severity. Focus or hover for details.`}
     >
       <Handle
         type="target"
@@ -80,6 +85,20 @@ function GraphNode({ data, selected }) {
         <span>{formatLabel(data.evidenceType)}</span>
       </div>
 
+      <div className={`attack-graph-node-tooltip ${data.nodeType === "finding" || data.nodeType === "asset" ? "left" : "right"}`} role="note">
+        <strong>{data.nodeType === "finding" ? "Vulnerability details" : formatLabel(data.nodeType)}</strong>
+        <span className="attack-graph-tooltip-title">{data.label}</span>
+        {data.fileLocation && <span className="attack-graph-tooltip-location">{data.fileLocation}</span>}
+        <span className="attack-graph-tooltip-section">Why it matters</span>
+        <p>{data.description || "No additional explanation was returned for this graph node."}</p>
+        {data.remediation && <><span className="attack-graph-tooltip-section">Suggested review</span><p>{data.remediation}</p></>}
+        <div className="attack-graph-tooltip-meta">
+          <span>{formatLabel(data.riskLevel)} severity</span>
+          <span>{formatLabel(data.evidenceType)} evidence</span>
+          {data.sourceScanner && <span>Detected by {data.sourceScanner}</span>}
+        </div>
+      </div>
+
       <Handle
         type="source"
         position={Position.Right}
@@ -92,6 +111,39 @@ function GraphNode({ data, selected }) {
 const nodeTypes = {
   attackNode: GraphNode,
 };
+
+function RelationshipEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, markerEnd, style, data }) {
+  const [path] = getBezierPath({ sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, curvature: 0.24 });
+  const coordinates = path.match(/[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:[eE][-+]?\d+)?/g)?.map(Number) || [];
+  // Keep the relationship badge beside the destination node, not halfway
+  // along long edges where it can read like a detached heading.
+  const t = 0.96;
+  const inverseT = 1 - t;
+  const labelX = coordinates.length >= 8
+    ? inverseT ** 3 * coordinates[0] + 3 * inverseT ** 2 * t * coordinates[2] + 3 * inverseT * t ** 2 * coordinates[4] + t ** 3 * coordinates[6]
+    : sourceX + (targetX - sourceX) * t;
+  const labelY = coordinates.length >= 8
+    ? inverseT ** 3 * coordinates[1] + 3 * inverseT ** 2 * t * coordinates[3] + 3 * inverseT * t ** 2 * coordinates[5] + t ** 3 * coordinates[7]
+    : sourceY + (targetY - sourceY) * t;
+  const relationship = data?.edgeType || "contains";
+  if (!data?.showLabel) {
+    return <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />;
+  }
+  return <>
+    <BaseEdge id={id} path={path} markerEnd={markerEnd} style={style} />
+    <EdgeLabelRenderer>
+      <div
+        className={`attack-graph-edge-label ${relationship}`}
+        style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
+        aria-label={`${formatLabel(relationship)} relationship: ${data?.description || "No additional details"}`}
+      >
+        {formatLabel(relationship).toUpperCase()}
+      </div>
+    </EdgeLabelRenderer>
+  </>;
+}
+
+const edgeTypes = { relationship: RelationshipEdge };
 
 function getGroupedPosition(node, index, counts) {
   const type = node.node_type || "component";
@@ -137,6 +189,7 @@ function getEdgeColor(edge) {
 
 export default function AttackGraph({
   graph,
+  findings = [],
   loading = false,
   error = "",
 }) {
@@ -159,6 +212,7 @@ export default function AttackGraph({
       findingIndex: 0,
       assetIndex: 0,
     };
+    const findingsByNodeId = new Map(findings.map((finding) => [`finding-${finding.id}`, finding]));
 
     const mappedNodes = sortedNodes.map((node, index) => ({
       id: node.id,
@@ -170,36 +224,52 @@ export default function AttackGraph({
         riskLevel: node.risk_level,
         evidenceType: node.evidence_type,
         description: node.description,
+        ...(findingsByNodeId.has(node.id) ? {
+          fileLocation: `${findingsByNodeId.get(node.id).file_path || "Unknown file"}${findingsByNodeId.get(node.id).line_number ? `:${findingsByNodeId.get(node.id).line_number}` : ""}`,
+          sourceScanner: findingsByNodeId.get(node.id).source_scanner,
+          remediation: findingsByNodeId.get(node.id).remediation,
+        } : {}),
       },
     }));
 
     const knownIds = new Set(rawNodes.map((node) => node.id));
+    const labeledRelationshipTargets = new Set();
 
     const mappedEdges = rawEdges
       .filter(
         (edge) =>
           knownIds.has(edge.source) && knownIds.has(edge.target)
       )
-      .map((edge, index) => ({
+      .map((edge, index) => {
+        const labelKey = `${edge.target}:${edge.edge_type}`;
+        // Keep dense structural links visible as edges, but label only the
+        // relationships that add useful security context. Repeated labels
+        // are collapsed when several findings converge on one target.
+        const showLabel = ["exposes", "may_reach", "depends_on"].includes(edge.edge_type)
+          && !labeledRelationshipTargets.has(labelKey);
+        if (showLabel) labeledRelationshipTargets.add(labelKey);
+        return {
         id: `${edge.source}-${edge.edge_type}-${edge.target}-${index}`,
         source: edge.source,
         target: edge.target,
-        type: "smoothstep",
-        label: "",
+        type: "relationship",
+        data: { edgeType: edge.edge_type, showLabel, description: `${edge.description || "Repository relationship"} (${formatLabel(edge.evidence_type)} evidence)` },
+        markerEnd: { type: MarkerType.ArrowClosed, color: getEdgeColor(edge), width: 16, height: 16 },
         animated: edge.evidence_type === "modeled",
         style: {
           stroke: getEdgeColor(edge),
           strokeWidth: edge.evidence_type === "observed" ? 1.8 : 1.4,
           opacity: edge.evidence_type === "observed" ? 0.8 : 0.55,
         },
-      }));
+      };
+      });
 
     return {
       nodes: mappedNodes,
       edges: mappedEdges,
       paths: rawPaths,
     };
-  }, [graph]);
+  }, [graph, findings]);
 
   const selectedPath = paths.find(
     (path) => path.id === selectedPathId
@@ -332,6 +402,7 @@ export default function AttackGraph({
           nodes={displayedNodes}
           edges={displayedEdges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           fitViewOptions={{ padding: 0.12, maxZoom: 0.85 }}
           minZoom={0.08}
@@ -348,23 +419,6 @@ export default function AttackGraph({
           <Controls
             showInteractive={false}
             position="bottom-left"
-          />
-          <MiniMap
-            position="bottom-right"
-            pannable
-            zoomable
-            nodeColor={(node) =>
-              NODE_COLORS[node.data?.nodeType] || "var(--node-neutral)"
-            }
-            nodeStrokeColor={(node) =>
-              SEVERITY_COLORS[node.data?.riskLevel] || "var(--node-neutral)"
-            }
-            maskColor="rgba(23, 63, 53, 0.08)"
-            bgColor="var(--surface)"
-            style={{
-              backgroundColor: "var(--surface)",
-              border: "1px solid var(--border)",
-            }}
           />
         </ReactFlow>
       </div>

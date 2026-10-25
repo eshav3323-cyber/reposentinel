@@ -1,0 +1,35 @@
+.repository-map-page { display: grid; gap: 14px; }
+.repository-map-notice { display: grid; gap: 4px; padding: 12px 15px; border: 1px solid var(--accent-border); border-radius: 6px; color: var(--text-secondary); background: var(--accent-surface); font-size: 11px; }
+.repository-map-notice strong { color: var(--text-primary); font-size: 12px; }
+.repository-map-stats { display: flex; flex-wrap: wrap; gap: 9px; }
+.repository-map-stats span { padding: 8px 11px; border: 1px solid var(--border-subtle); border-radius: 5px; color: var(--text-secondary); background: var(--bg-card); font-size: 10px; }
+.repository-map-stats strong { color: var(--accent-primary); font-size: 14px; }
+.repository-map-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, .8fr); gap: 14px; align-items: stretch; }
+.repository-map-panel { min-width: 0; overflow: hidden; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--bg-card); box-shadow: var(--shadow-soft); }
+.repository-map-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--divider); }
+.repository-map-heading .eyebrow { margin: 0 0 3px; }
+.repository-map-heading h2 { margin: 0; color: var(--text-primary); font-size: 15px; }
+.repository-map-heading > span { color: var(--text-muted); font-size: 10px; }
+.repository-map-canvas { width: 100%; height: min(68vh, 650px); min-height: 390px; background: var(--bg-elevated); }
+.repository-map-canvas .react-flow__controls { overflow: hidden; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--bg-card); box-shadow: 0 6px 16px rgba(0,0,0,.28); }
+.repository-map-canvas .react-flow__controls-button { display: grid; width: 32px; height: 32px; place-items: center; border-bottom: 1px solid var(--divider); color: var(--text-primary); background: var(--bg-card); fill: var(--text-primary); }
+.repository-map-canvas .react-flow__controls-button:hover { background: var(--bg-hover); }
+.repository-map-canvas .react-flow__controls-button svg { display: block; width: 14px; height: 14px; fill: currentColor; stroke: currentColor; }
+.repository-map-canvas .react-flow__controls-button:last-child { border-bottom: 0; }
+.repository-map-node { min-width: 160px; max-width: 260px; padding: 11px 14px; border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text-primary); background: var(--bg-card); font-size: 11px; font-weight: 650; overflow-wrap: anywhere; box-shadow: 0 5px 16px rgba(0,0,0,.18); }
+.repository-map-node.directory { border-left: 3px solid var(--node-sage); }
+.repository-map-node.file { border-left: 3px solid var(--accent-primary); font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.repository-map-tree-panel { display: flex; min-height: 450px; flex-direction: column; }
+.repository-tree-scroll { min-height: 0; max-height: min(68vh, 650px); overflow: auto; padding: 15px; }
+.repository-tree, .repository-tree ul { margin: 0; padding-left: 17px; list-style: none; }
+.repository-tree { padding-left: 0; }
+.repository-tree li { position: relative; margin: 2px 0; }
+.repository-tree ul { margin-left: 5px; border-left: 1px solid var(--border-subtle); }
+.repository-tree-label { display: inline-flex; align-items: baseline; gap: 7px; max-width: 100%; padding: 4px 6px; border-radius: 4px; color: var(--text-secondary); font-size: 11px; overflow-wrap: anywhere; }
+.repository-tree-label.directory { color: var(--text-primary); font-weight: 650; }
+.repository-tree-label.file { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.repository-tree-label > span { color: var(--accent-primary); font-family: inherit; }
+.repository-map-empty { margin-top: 14px; }
+.product-shell[data-theme="light"] .repository-map-panel { box-shadow: 0 8px 20px rgba(34,24,22,.06); }
+@media (max-width: 980px) { .repository-map-layout { grid-template-columns: 1fr; } .repository-map-tree-panel { min-height: 280px; } .repository-tree-scroll { max-height: 420px; } }
+@media (max-width: 600px) { .repository-map-canvas { min-height: 330px; height: 54vh; } .repository-map-heading { padding: 12px; } }

@@ -1,5 +1,48 @@
 :root {
-  color-scheme: light;
+  --bg-app: #121212;
+  --bg-sidebar: #0D0D0D;
+  --bg-card: #1B1B1B;
+  --bg-elevated: #242020;
+  --bg-input: #191919;
+  --bg-hover: #2A2525;
+  --border-subtle: #383333;
+  --divider: #302C2C;
+  --text-primary: #F5F2F0;
+  --text-secondary: #C2B8B5;
+  --text-muted: #918784;
+  --text-disabled: #686260;
+  --accent-primary: #FF5D57;
+  --accent-hover: #F04444;
+  --accent-surface: #351C1C;
+  --accent-border: #713333;
+  --accent-amber: #E6A34A;
+  --success: #75C69B;
+  --info: #A8ADB4;
+  --severity-critical: #FF5D57;
+  --severity-high: #F07855;
+  --severity-medium: #E6A34A;
+  --severity-low: #75C69B;
+  --surface-high: #321F1B;
+  --surface-warning: #2D2419;
+  --surface-success: #192820;
+  --surface-info: #202124;
+  --relationship-structural: #C2B8B5;
+  --relationship-structural-surface: #252525;
+  --relationship-structural-border: #514949;
+  --relationship-dependency: #8EC8DE;
+  --relationship-dependency-surface: #1C2931;
+  --relationship-dependency-border: #3F6171;
+  --relationship-finding: #F0B767;
+  --relationship-finding-surface: #2D2419;
+  --relationship-finding-border: #70572F;
+  --relationship-exposure: #FF8B85;
+  --relationship-exposure-surface: #351C1C;
+  --relationship-exposure-border: #713333;
+  --relationship-modeled: #D995B5;
+  --relationship-modeled-surface: #301F2A;
+  --relationship-modeled-border: #754C62;
+
+  color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     "Segoe UI", sans-serif;
   font-synthesis: none;
@@ -8,52 +51,16 @@
   -moz-osx-font-smoothing: grayscale;
   font-weight: 400;
   line-height: 1.55;
-  background: #f7f5ef;
-  color: #252c27;
+  background: var(--bg-app);
+  color: var(--text-primary);
 }
 
-* {
-  box-sizing: border-box;
-}
-
-html {
-  min-width: 320px;
-  background: #f7f5ef;
-}
-
-body {
-  min-width: 320px;
-  min-height: 100vh;
-  margin: 0;
-  background: #f7f5ef;
-  color: #252c27;
-}
-
-button,
-input,
-select,
-textarea {
-  font: inherit;
-}
-
-button {
-  cursor: pointer;
-}
-
-button:disabled {
-  cursor: not-allowed;
-}
-
-a {
-  color: inherit;
-}
-
-#root {
-  min-height: 100vh;
-  width: 100%;
-}
-
-::selection {
-  color: #fff;
-  background: #237052;
-}
+* { box-sizing: border-box; }
+html { min-width: 320px; background: var(--bg-app); }
+body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--bg-app); color: var(--text-primary); }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+a { color: inherit; }
+#root { min-height: 100vh; width: 100%; }
+::selection { color: var(--text-primary); background: var(--accent-primary); }
