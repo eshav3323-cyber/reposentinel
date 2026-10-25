@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: reposentinel-health
+    runtime: python
+    buildCommand: |
+      set -eu
+      trap 'rm -f /tmp/gitleaks_8.30.1_linux_x64.tar.gz /tmp/osv-scanner_linux_amd64' EXIT
+      python -m pip install -r backend/requirements.txt
+      python -m venv backend/.semgrep
+      backend/.semgrep/bin/python -m pip install --no-cache-dir semgrep==1.182.1
+      mkdir -p backend/.tools
+      curl --fail --location --silent --show-error https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz --output /tmp/gitleaks_8.30.1_linux_x64.tar.gz
+      printf '%s  %s\n' 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb /tmp/gitleaks_8.30.1_linux_x64.tar.gz | sha256sum --check -
+      tar --extract --gzip --file /tmp/gitleaks_8.30.1_linux_x64.tar.gz --directory backend/.tools gitleaks
+      curl --fail --location --silent --show-error https://github.com/google/osv-scanner/releases/download/v1.9.2/osv-scanner_linux_amd64 --output /tmp/osv-scanner_linux_amd64
+      printf '%s  %s\n' d6af4b67fa5de658598bd2d445efb99e90d1734b3146962418719c4350ecb74b /tmp/osv-scanner_linux_amd64 | sha256sum --check -
+      mv /tmp/osv-scanner_linux_amd64 backend/.tools/osv-scanner
+      chmod 0755 backend/.tools/gitleaks backend/.tools/osv-scanner
+    startCommand: cd backend && PATH="$PWD/.tools:$PWD/.semgrep/bin:$PATH" exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.12
+      - key: CORS_ORIGINS
+        value: https://reposentinel.vercel.app

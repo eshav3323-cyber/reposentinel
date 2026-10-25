@@ -4,6 +4,8 @@ venv/
 env/
 backend/.venv/
 backend/venv/
+backend/.semgrep/
+backend/.tools/
 
 # Python generated files
 __pycache__/
