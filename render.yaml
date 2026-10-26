@@ -17,7 +17,7 @@ services:
       printf '%s  %s\n' d6af4b67fa5de658598bd2d445efb99e90d1734b3146962418719c4350ecb74b /tmp/osv-scanner_linux_amd64 | sha256sum --check -
       mv /tmp/osv-scanner_linux_amd64 .tools/osv-scanner
       chmod 0755 .tools/gitleaks .tools/osv-scanner
-    startCommand: PATH="$PWD/.tools:$PWD/.semgrep/bin:$PATH" exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"
+    startCommand: bash -c 'export PATH="$PWD/.tools:$PWD/.semgrep/bin:$PATH"; exec uvicorn app.main:app --host 0.0.0.0 --port "$PORT"'
     healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
