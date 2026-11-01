@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { getScannerStatus } from "../services/api";
 
@@ -8,12 +7,68 @@ export default function ScannerStatus() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getScannerStatus()
-      .then(setData)
-      .catch(() => {
-        setError("Could not load scanner availability from the backend.");
-      })
-      .finally(() => setLoading(false));
+    let cancelled = false;
+
+    async function loadScannerStatus() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const response = await getScannerStatus();
+
+        // Support both Axios responses and direct JSON responses.
+        const payload = response?.data ?? response;
+
+        // Support either { scanners: [...] } or a direct array.
+        const scanners = Array.isArray(payload)
+          ? payload
+          : payload?.scanners;
+
+        if (!Array.isArray(scanners)) {
+          throw new Error("Unexpected scanner API response format.");
+        }
+
+        const normalizedScanners = scanners.map((scanner, index) => ({
+          ...scanner,
+          id: scanner.id ?? scanner.name ?? `scanner-${index}`,
+          name: scanner.name ?? scanner.id ?? `Scanner ${index + 1}`,
+          purpose: scanner.purpose ?? scanner.description ?? "",
+          message: scanner.message ?? scanner.version ?? "",
+          available: scanner.available === true,
+        }));
+
+        const available = normalizedScanners.filter(
+          (scanner) => scanner.available
+        ).length;
+
+        if (!cancelled) {
+          setData({
+            scanners: normalizedScanners,
+            available: payload?.available ?? available,
+            total: payload?.total ?? normalizedScanners.length,
+          });
+        }
+      } catch (err) {
+        console.error("Scanner availability request failed:", err);
+
+        if (!cancelled) {
+          setError(
+            err?.message ||
+              "Could not load scanner availability. Check the API connection."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadScannerStatus();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -31,12 +86,20 @@ export default function ScannerStatus() {
         )}
       </div>
 
-      {loading && <p className="scanner-message">Checking installed tools...</p>}
+      {loading && (
+        <p className="scanner-message">Checking installed tools...</p>
+      )}
 
       {error && (
-        <p className="scanner-error" role="alert">
-          {error}
-        </p>
+        <div className="scanner-error" role="alert">
+          <p>{error}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+          >
+            Reload page
+          </button>
+        </div>
       )}
 
       {data?.scanners.map((scanner) => (
