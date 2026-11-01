@@ -34,7 +34,9 @@ export default function ScannerStatus() {
           name: scanner.name ?? scanner.id ?? `Scanner ${index + 1}`,
           purpose: scanner.purpose ?? scanner.description ?? "",
           message: scanner.message ?? scanner.version ?? "",
-          available: scanner.available === true,
+          available:
+          scanner.available === true ||
+          scanner.status === "available",
         }));
 
         const available = normalizedScanners.filter(
