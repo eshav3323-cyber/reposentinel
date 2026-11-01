@@ -1,11 +1,22 @@
-// Local development and static previews talk to FastAPI directly. Set
-// VITE_API_BASE_URL when the API is hosted elsewhere.
-const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL ||
-  (typeof window !== "undefined"
-    ? window.location.origin
-    : "http://127.0.0.1:8000")
-).replace(/\/$/, "");
+// Local development talks to the backend on localhost. Production builds use
+// a dedicated backend host unless a custom VITE_API_BASE_URL is configured.
+function resolveApiBaseUrl() {
+  const configured = import.meta.env.VITE_API_BASE_URL;
+  if (configured) return configured.replace(/\/$/, "");
+
+  if (typeof window === "undefined") {
+    return "http://127.0.0.1:8000";
+  }
+
+  const host = window.location.hostname;
+  if (host === "localhost" || host === "127.0.0.1" || host.endsWith(".local")) {
+    return "http://127.0.0.1:8000";
+  }
+
+  return "https://reposentinel-health.onrender.com";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 const DEFAULT_TIMEOUT_MS = 8000;
 
 async function request(endpoint, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
