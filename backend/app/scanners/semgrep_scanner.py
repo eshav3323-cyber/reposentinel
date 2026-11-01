@@ -21,23 +21,11 @@ class SemgrepScanError(RuntimeError):
 RULES_PATH = Path(__file__).with_name("semgrep_rules.yml")
 
 
-def _semgrep_command(executable: str) -> list[str]:
-    """Prefer the installed Semgrep package entry point in this interpreter.
 
-    On Windows, a console-script launcher can be bound to a different Python
-    environment than the backend and fail while importing its dependencies.
-    Using the package entry point keeps Semgrep and its dependencies together.
-    """
-    try:
-        distribution("semgrep")
-    except PackageNotFoundError:
-        return [executable]
-    return [
-        sys.executable,
-        "-c",
-        "from semgrep.console_scripts.entrypoint import main; main()",
-        "--legacy",
-    ]
+def _semgrep_command(executable: str) -> list[str]:
+    """Invoke the discovered Semgrep executable directly."""
+    return [executable]
+
 
 
 @lru_cache(maxsize=1)
