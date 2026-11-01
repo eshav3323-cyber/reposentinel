@@ -129,11 +129,16 @@ app.add_middleware(
         for origin in os.getenv(
             "CORS_ORIGINS",
             "http://localhost:5173,http://127.0.0.1:5173,"
-            "http://localhost:4173,http://127.0.0.1:4173,https://reposentinel.vercel.app",
+            "http://localhost:4173,http://127.0.0.1:4173,"
+            "https://reposentinel.vercel.app",
         ).split(",")
         if origin.strip()
     ],
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origin_regex=(
+        r"https?://"
+        r"((localhost|127\.0\.0\.1)(:\d+)?|"
+        r"([a-z0-9-]+\.)*(vercel\.app|netlify\.app|render\.com|onrender\.com|github\.dev|railway\.app|fly\.dev)(:\d+)?)$"
+    ),
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type"],

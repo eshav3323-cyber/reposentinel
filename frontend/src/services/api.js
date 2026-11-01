@@ -1,7 +1,10 @@
 // Local development and static previews talk to FastAPI directly. Set
 // VITE_API_BASE_URL when the API is hosted elsewhere.
 const API_BASE_URL = (
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000"
+  import.meta.env.VITE_API_BASE_URL ||
+  (typeof window !== "undefined"
+    ? window.location.origin
+    : "http://127.0.0.1:8000")
 ).replace(/\/$/, "");
 const DEFAULT_TIMEOUT_MS = 8000;
 
