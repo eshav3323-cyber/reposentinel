@@ -12,6 +12,13 @@ from app.core.archive_handler import (
     MAX_ARCHIVE_SIZE,
     read_repository_zip,
 )
+from app.core.scan_storage import (
+    initialize_scan_storage,
+    save_scan,
+    get_scan as get_persisted_scan,
+    load_scans,
+    MAX_STORED_SCANS,
+)
 from app.scanners.heuristic import scan_source_files
 from app.scanners.gitleaks import (
     GitleaksScanError,
@@ -29,9 +36,8 @@ from app.models.findings import Finding
 
 router = APIRouter(prefix="/api/scans", tags=["Scans"])
 
-# Temporary in-memory storage; results disappear on backend restart.
-SCAN_STORE: dict[str, dict] = {}
-MAX_STORED_SCANS = 50
+initialize_scan_storage()
+SCAN_STORE: dict[str, dict] = load_scans()
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 
@@ -67,15 +73,12 @@ class ScanResponse(BaseModel):
 
 
 def build_summary(findings: list, files_analyzed: int) -> dict:
-    """Count unique findings by their normalized severity."""
     counts = dict.fromkeys(SEVERITIES, 0)
 
     for finding in findings:
         severity = str(finding.severity).lower()
-
         if severity not in counts:
             severity = "info"
-
         counts[severity] += 1
 
     return {
@@ -86,32 +89,18 @@ def build_summary(findings: list, files_analyzed: int) -> dict:
 
 
 def deduplicate_findings(findings: list) -> list:
-    """
-    Deduplicate by normalized finding ID, preserving first occurrence.
-
-    Scanner-specific counts are kept separately so deduplication does
-    not hide how many findings each scanner originally returned.
-    """
     unique = {}
 
     for finding in findings:
-        finding_id = getattr(finding, "id", None)
-
-        if not finding_id:
-            # Do not silently discard a finding without an ID.
-            finding_id = str(uuid4())
-
+        finding_id = getattr(finding, "id", None) or str(uuid4())
         if finding_id not in unique:
             unique[finding_id] = finding
 
     return list(unique.values())
 
 
-
-
 def count_unique_by_scanner(findings: list) -> dict[str, int]:
-    """Count deduplicated findings by their originating scanner."""
-    counts: dict[str, int] = {
+    counts = {
         "heuristic": 0,
         "gitleaks": 0,
         "semgrep": 0,
@@ -135,13 +124,10 @@ def count_unique_by_scanner(findings: list) -> dict[str, int]:
         ).strip().lower()
 
         scanner_name = aliases.get(source)
-
         if scanner_name:
             counts[scanner_name] += 1
 
     return counts
-
-
 
 
 @router.post("", response_model=ScanResponse)
@@ -174,16 +160,12 @@ async def scan_repository(file: UploadFile = File(...)):
         )
 
     try:
-        source_files = await asyncio.to_thread(read_repository_zip, archive_bytes)
+        source_files = await asyncio.to_thread(
+            read_repository_zip, archive_bytes
+        )
     except ArchiveValidationError as exc:
-        raise HTTPException(
-            status_code=400,
-            detail=str(exc),
-        ) from exc
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Scanner subprocesses can take seconds. Run them on worker threads so
-    # health checks and separate uploads remain responsive, and concurrently
-    # so end-to-end latency is close to the slowest scanner rather than their sum.
     scanners = [
         ("heuristic", scan_source_files, None),
         ("gitleaks", scan_with_gitleaks, GitleaksScanError),
@@ -194,99 +176,116 @@ async def scan_repository(file: UploadFile = File(...)):
     async def run_scanner(name, scan_function, expected_error):
         started = perf_counter()
         try:
-            results = await asyncio.to_thread(scan_function, source_files)
-            status = {
+            results = await asyncio.to_thread(
+                scan_function, source_files
+            )
+            return name, results, {
                 "status": "completed",
                 "findings": len(results),
                 "error": None,
-                "duration_ms": round((perf_counter() - started) * 1000),
+                "duration_ms": round(
+                    (perf_counter() - started) * 1000
+                ),
             }
-            return name, results, status
-        except Exception as exc:
-            known_failure = (
-                expected_error is not None
-                and isinstance(exc, expected_error)
-            )
+        except Exception:
             return name, [], {
                 "status": "failed",
                 "findings": 0,
-                "error": (
-                    f"{name} could not complete the scan."
-                    if known_failure
-                    else f"{name} encountered an unexpected error."
+                "error": f"{name} could not complete the scan.",
+                "duration_ms": round(
+                    (perf_counter() - started) * 1000
                 ),
-                "duration_ms": round((perf_counter() - started) * 1000),
             }
 
     outcomes = await asyncio.gather(*(
-        run_scanner(name, scan_function, expected_error)
-        for name, scan_function, expected_error in scanners
+        run_scanner(name, function, expected_error)
+        for name, function, expected_error in scanners
     ))
+
     all_findings = []
     scanner_status = {}
+
     for name, results, status in outcomes:
         all_findings.extend(results)
         scanner_status[name] = status
 
     findings = deduplicate_findings(all_findings)
-
     unique_counts = count_unique_by_scanner(findings)
 
     for name, status in scanner_status.items():
         status["unique_findings"] = unique_counts.get(name, 0)
 
     failures = [
-        name
-        for name, status in scanner_status.items()
+        name for name, status in scanner_status.items()
         if status["status"] != "completed"
     ]
 
     scan_status = "partial" if failures else "completed"
 
-    if failures:
-        message = (
-            "Partial analysis: one or more scanners failed. "
-            "Review scanner_status before relying on these results."
-        )
-    else:
-        message = (
+    message = (
+        "Partial analysis: one or more scanners failed. "
+        "Review scanner_status before relying on these results."
+        if failures
+        else (
             "Heuristic, Gitleaks, Semgrep, and OSV-Scanner analysis "
             "completed. Findings require human review."
         )
+    )
 
     scan_id = str(uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
-    summary = build_summary(findings, len(source_files))
 
     result = {
         "scan_id": scan_id,
         "status": scan_status,
         "filename": filename,
         "created_at": created_at,
-        "summary": summary,
+        "summary": build_summary(findings, len(source_files)),
         "scanner_status": scanner_status,
         "duration_ms": round((perf_counter() - scan_started) * 1000),
         "findings": [finding.model_dump() for finding in findings],
         "message": message,
     }
 
+    # Save to SQLite before returning the scan to the frontend.
+    try:
+        await asyncio.to_thread(save_scan, result)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to save scan results to persistent storage.",
+        ) from exc
+
     SCAN_STORE[scan_id] = result
+
+    # Keep the in-memory cache in sync with the SQLite retention limit.
     while len(SCAN_STORE) > MAX_STORED_SCANS:
         SCAN_STORE.pop(next(iter(SCAN_STORE)))
 
     return result
 
 
+def find_scan(scan_id: str) -> dict | None:
+    """Read the cache first, then SQLite if the scan isn't cached."""
+    result = SCAN_STORE.get(scan_id)
+    if result is not None:
+        return result
+
+    result = get_persisted_scan(scan_id)
+    if result is not None:
+        SCAN_STORE[scan_id] = result
+
+    return result
+
+
 @router.get("/{scan_id}")
 def get_scan(scan_id: str):
-    result = SCAN_STORE.get(scan_id)
+    result = find_scan(scan_id)
 
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Scan not found. It may have expired or the backend restarted."
-            ),
+            detail="Scan not found. It may have expired or been deleted.",
         )
 
     return {
@@ -298,18 +297,18 @@ def get_scan(scan_id: str):
 
 @router.get("/{scan_id}/findings")
 def get_scan_findings(scan_id: str):
-    result = SCAN_STORE.get(scan_id)
+    result = find_scan(scan_id)
 
     if result is None:
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Scan not found. It may have expired or the backend restarted."
-            ),
+            detail="Scan not found. It may have expired or been deleted.",
         )
+
+    findings = result.get("findings", [])
 
     return {
         "scan_id": scan_id,
-        "total": len(result["findings"]),
-        "findings": result["findings"],
+        "total": len(findings),
+        "findings": findings,
     }

@@ -3,15 +3,16 @@ import json
 import shutil
 import subprocess
 import tempfile
+import sys
 from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, distribution
 from pathlib import Path, PurePosixPath
-import sys
+
+import yaml
 
 from app.core.archive_handler import SourceFile
 from app.core.finding_normalizer import normalize_finding
 from app.models.findings import Finding
-import yaml
 
 
 class SemgrepScanError(RuntimeError):
@@ -21,11 +22,18 @@ class SemgrepScanError(RuntimeError):
 RULES_PATH = Path(__file__).with_name("semgrep_rules.yml")
 
 
-
 def _semgrep_command(executable: str) -> list[str]:
-    """Invoke the discovered Semgrep executable directly."""
-    return [executable]
+    """Use the active Python interpreter when Semgrep is installed."""
+    try:
+        distribution("semgrep")
+    except PackageNotFoundError:
+        return [executable]
 
+    return [
+        sys.executable,
+        "-c",
+        "from semgrep.console_scripts.entrypoint import main; main()",
+    ]
 
 
 @lru_cache(maxsize=1)
@@ -35,9 +43,11 @@ def _configured_rule_ids() -> frozenset[str]:
         config = yaml.safe_load(RULES_PATH.read_text(encoding="utf-8"))
     except (OSError, UnicodeError, yaml.YAMLError):
         return frozenset()
+
     rules = config.get("rules", []) if isinstance(config, dict) else []
     return frozenset(
-        rule["id"] for rule in rules
+        rule["id"]
+        for rule in rules
         if isinstance(rule, dict) and isinstance(rule.get("id"), str)
     )
 
@@ -45,9 +55,11 @@ def _configured_rule_ids() -> frozenset[str]:
 def _normalize_rule_id(rule_id: str) -> str:
     """Remove Semgrep's config namespace only for a declared local rule ID."""
     configured_ids = _configured_rule_ids()
+
     for configured_id in configured_ids:
         if rule_id == configured_id or rule_id.endswith(f".{configured_id}"):
             return configured_id
+
     return rule_id
 
 
@@ -82,7 +94,9 @@ def scan_with_semgrep(
     findings: list[Finding] = []
 
     try:
-        with tempfile.TemporaryDirectory(prefix="reposentinel-semgrep-") as temp:
+        with tempfile.TemporaryDirectory(
+            prefix="reposentinel-semgrep-"
+        ) as temp:
             root = Path(temp) / "source"
             root.mkdir()
             report_path = Path(temp) / "semgrep-report.json"
@@ -109,6 +123,7 @@ def scan_with_semgrep(
 
             command = [
                 *_semgrep_command(executable),
+                "--legacy",
                 "scan",
                 "--config",
                 str(RULES_PATH),
@@ -140,9 +155,6 @@ def scan_with_semgrep(
                     "Semgrep could not be started."
                 ) from exc
 
-            # Semgrep may use nonzero exit codes for scan errors or
-            # findings, depending on its options/version. Parse the report
-            # when available and reject a missing or invalid report.
             if not report_path.is_file():
                 raise SemgrepScanError(
                     "Semgrep did not produce its JSON report."
@@ -154,7 +166,9 @@ def scan_with_semgrep(
                 )
 
             try:
-                report = json.loads(report_path.read_text(encoding="utf-8"))
+                report = json.loads(
+                    report_path.read_text(encoding="utf-8")
+                )
             except (OSError, UnicodeError, json.JSONDecodeError) as exc:
                 raise SemgrepScanError(
                     "Semgrep produced an invalid JSON report."
@@ -215,7 +229,9 @@ def scan_with_semgrep(
                     "WARNING": "medium",
                     "INFO": "info",
                 }
-                raw_severity = str(extra.get("severity") or "WARNING").upper()
+                raw_severity = str(
+                    extra.get("severity") or "WARNING"
+                ).upper()
 
                 findings.append(
                     normalize_finding(
@@ -224,9 +240,10 @@ def scan_with_semgrep(
                                 extra.get("message")
                                 or "Potential code security issue"
                             ),
-                            "rule_id": str(
-                                _normalize_rule_id(
-                                    str(item.get("check_id") or "SEMGREP-UNSPECIFIED")
+                            "rule_id": _normalize_rule_id(
+                                str(
+                                    item.get("check_id")
+                                    or "SEMGREP-UNSPECIFIED"
                                 )
                             ),
                             "severity": severity_map.get(
@@ -236,9 +253,9 @@ def scan_with_semgrep(
                             "line_number": line_number,
                             "description": str(
                                 extra.get("message")
-                                or "Semgrep matched a configured static-analysis rule."
+                                or "Semgrep matched a configured "
+                                "static-analysis rule."
                             ),
-                            # Do not store raw source lines in scan evidence.
                             "evidence": "[Source evidence omitted]",
                             "remediation": (
                                 "Review the matching rule and surrounding code. "
@@ -252,8 +269,6 @@ def scan_with_semgrep(
                     )
                 )
 
-            # A nonzero exit without reported findings/errors is suspicious;
-            # don't claim success when Semgrep itself failed.
             if completed.returncode != 0 and not report["results"]:
                 raise SemgrepScanError(
                     "Semgrep exited unsuccessfully. Review the backend logs."
