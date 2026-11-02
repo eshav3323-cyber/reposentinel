@@ -237,6 +237,8 @@ export default function AttackGraph({
 }) {
   const [selectedPathId, setSelectedPathId] = useState("all");
   const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [copiedPathId, setCopiedPathId] = useState(null);
+  const [copiedNodeId, setCopiedNodeId] = useState(null);
 
   const { nodes, edges, paths } = useMemo(() => {
     const rawNodes = graph?.nodes || [];
@@ -323,6 +325,27 @@ export default function AttackGraph({
     [nodes, selectedNodeId]
   );
 
+  const selectedPathFixes = useMemo(() => {
+    if (!selectedPath) return [];
+    const pathNodeIds = new Set(
+      (selectedPath.node_ids || []).flatMap((nodeId) => [String(nodeId), `finding-${String(nodeId)}`])
+    );
+
+    return findings
+      .map((finding) => {
+        const id = String(finding.id ?? "");
+        const remediation = finding.remediation || finding.fix_method || finding.suggested_fix || "";
+        if (!remediation) return null;
+
+        if (pathNodeIds.has(id) || pathNodeIds.has(`finding-${id}`)) {
+          return remediation.trim();
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+  }, [findings, selectedPath]);
+
   const selectedNodeIds = useMemo(
     () =>
       new Set(
@@ -396,29 +419,66 @@ export default function AttackGraph({
     }
   }
 
+  async function handleCopyPath(path) {
+    if (!path) return;
+    const fixes = findings
+      .map((finding) => {
+        const id = String(finding.id ?? "");
+        const remediation = finding.remediation || finding.fix_method || finding.suggested_fix || "";
+        if (!remediation) return null;
+        if ((path.node_ids || []).includes(id) || (path.node_ids || []).includes(`finding-${id}`)) {
+          return remediation.trim();
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    const text = [
+      `Path: ${path.title}`,
+      `Risk: ${formatLabel(path.risk_level)}`,
+      `Explanation: ${path.explanation || "No explanation provided."}`,
+      `Fix method: ${fixes.length ? fixes.join("\n- ") : "No explicit remediation guidance was provided for this path."}`,
+      `Node IDs: ${(path.node_ids || []).join(", ")}`,
+    ].join("\n");
+
+    const copied = await copyText(text);
+    if (copied) {
+      setCopiedPathId(path.id);
+      window.setTimeout(() => {
+        setCopiedPathId((current) => (current === path.id ? null : current));
+      }, 1200);
+    }
+  }
+
   async function handleCopySelectedPath() {
     if (!selectedPath) return;
+    await handleCopyPath(selectedPath);
+  }
+
+  async function handleCopyNode(node) {
+    if (!node || !node.data) return;
     const text = [
-      `Path: ${selectedPath.title}`,
-      `Risk: ${formatLabel(selectedPath.risk_level)}`,
-      `Explanation: ${selectedPath.explanation || "No explanation provided."}`,
-      `Node IDs: ${(selectedPath.node_ids || []).join(", ")}`,
-    ].join("\n");
-    await copyText(text);
+      `${formatLabel(node.data.nodeType)}: ${node.data.label}`,
+      `Severity: ${formatLabel(node.data.riskLevel)}`,
+      `Evidence: ${formatLabel(node.data.evidenceType)}`,
+      node.data.fileLocation ? `Location: ${node.data.fileLocation}` : null,
+      node.data.description ? `Why it matters: ${node.data.description}` : null,
+      node.data.remediation ? `Suggested review: ${node.data.remediation}` : null,
+      node.data.sourceScanner ? `Detected by: ${node.data.sourceScanner}` : null,
+    ].filter(Boolean).join("\n");
+
+    const copied = await copyText(text);
+    if (copied) {
+      setCopiedNodeId(node.id);
+      window.setTimeout(() => {
+        setCopiedNodeId((current) => (current === node.id ? null : current));
+      }, 1200);
+    }
   }
 
   async function handleCopySelectedNode() {
     if (!selectedNode || !selectedNode.data) return;
-    const text = [
-      `${formatLabel(selectedNode.data.nodeType)}: ${selectedNode.data.label}`,
-      `Severity: ${formatLabel(selectedNode.data.riskLevel)}`,
-      `Evidence: ${formatLabel(selectedNode.data.evidenceType)}`,
-      selectedNode.data.fileLocation ? `Location: ${selectedNode.data.fileLocation}` : null,
-      selectedNode.data.description ? `Why it matters: ${selectedNode.data.description}` : null,
-      selectedNode.data.remediation ? `Suggested review: ${selectedNode.data.remediation}` : null,
-      selectedNode.data.sourceScanner ? `Detected by: ${selectedNode.data.sourceScanner}` : null,
-    ].filter(Boolean).join("\n");
-    await copyText(text);
+    await handleCopyNode(selectedNode);
   }
 
   if (loading) {
@@ -481,6 +541,45 @@ export default function AttackGraph({
           </select>
         </label>
       </div>
+
+      {paths.length > 0 && (
+        <div className="graph-path-list" aria-label="Modeled attack paths">
+          {paths.map((path) => {
+            const isSelected = path.id === selectedPathId;
+            const isCopied = copiedPathId === path.id;
+            return (
+              <button
+                key={path.id}
+                type="button"
+                className={`graph-path-item ${isSelected ? "selected" : ""}`}
+                onClick={() => setSelectedPathId(path.id)}
+              >
+                <span className="graph-path-item-title">{path.title}</span>
+                <span className="graph-path-item-meta">{formatLabel(path.risk_level)} risk</span>
+                <span
+                  className="graph-path-copy-inline"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    void handleCopyPath(path);
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Copy path ${path.title}`}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void handleCopyPath(path);
+                    }
+                  }}
+                >
+                  {isCopied ? "Copied" : "Copy"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="attack-graph-legend">
         {Object.entries(NODE_COLORS).map(([type, color]) => (
@@ -546,8 +645,17 @@ export default function AttackGraph({
 
           <p>{selectedPath.explanation}</p>
 
+          {selectedPathFixes.length > 0 && (
+            <div className="path-fix-details">
+              <p className="attack-path-eyebrow">FIX METHOD</p>
+              <p>{selectedPathFixes.join("\n")}</p>
+            </div>
+          )}
+
           <div className="attack-path-actions">
-            <button type="button" className="path-copy-button" onClick={handleCopySelectedPath}>Copy selected path</button>
+            <button type="button" className="path-copy-button" onClick={handleCopySelectedPath}>
+              {copiedPathId === selectedPath.id ? "Copied" : "Copy selected path"}
+            </button>
           </div>
 
           <p className="path-caveat">
@@ -571,7 +679,9 @@ export default function AttackGraph({
           {selectedNode.data.fileLocation && <p className="node-location"><strong>Location:</strong> {selectedNode.data.fileLocation}</p>}
           {selectedNode.data.remediation && <p className="node-remediation"><strong>Suggested review:</strong> {selectedNode.data.remediation}</p>}
           <div className="attack-path-actions">
-            <button type="button" className="path-copy-button" onClick={handleCopySelectedNode}>Copy selected bug</button>
+            <button type="button" className="path-copy-button" onClick={handleCopySelectedNode}>
+              {copiedNodeId === selectedNode.id ? "Copied" : "Copy selected bug"}
+            </button>
           </div>
         </section>
       )}

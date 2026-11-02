@@ -52,6 +52,57 @@
   font-size: 11px;
 }
 
+.graph-path-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.graph-path-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-alt);
+  color: var(--ink);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.graph-path-item:hover,
+.graph-path-item.selected {
+  border-color: var(--border-strong);
+  background: var(--emerald-soft);
+  box-shadow: 0 5px 12px rgba(20, 87, 65, 0.08);
+}
+
+.graph-path-item-title {
+  font-weight: 700;
+}
+
+.graph-path-item-meta {
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: capitalize;
+}
+
+.graph-path-copy-inline {
+  padding: 5px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--forest-700);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .attack-graph-legend {
   display: flex;
   flex-wrap: wrap;
@@ -284,6 +335,22 @@
   margin-bottom: 0;
   color: var(--amber);
   font-size: 10px;
+}
+
+.path-fix-details {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-alt);
+}
+
+.path-fix-details p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+  white-space: pre-line;
 }
 
 .attack-path-actions {
