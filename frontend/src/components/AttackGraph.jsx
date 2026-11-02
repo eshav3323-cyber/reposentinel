@@ -51,6 +51,45 @@ function GraphNode({ data, selected }) {
       ? SEVERITY_COLORS[data.riskLevel] || SEVERITY_COLORS.unknown
       : nodeColor;
 
+  async function copyNodeDetails(event) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const lines = [
+      `${formatLabel(data.nodeType)}: ${data.label}`,
+      `Severity: ${formatLabel(data.riskLevel)}`,
+      `Evidence: ${formatLabel(data.evidenceType)}`,
+      data.fileLocation ? `Location: ${data.fileLocation}` : null,
+      data.description ? `Why it matters: ${data.description}` : null,
+      data.remediation ? `Suggested review: ${data.remediation}` : null,
+      data.sourceScanner ? `Detected by: ${data.sourceScanner}` : null,
+    ].filter(Boolean);
+
+    const payload = lines.join("\n");
+
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(payload);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = payload;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      event.currentTarget.textContent = "Copied";
+      window.setTimeout(() => {
+        event.currentTarget.textContent = "Copy bug";
+      }, 1200);
+    } catch (error) {
+      console.error("Failed to copy graph node details", error);
+    }
+  }
+
   return (
     <div
       className={`attack-graph-node ${
@@ -97,6 +136,9 @@ function GraphNode({ data, selected }) {
           <span>{formatLabel(data.evidenceType)} evidence</span>
           {data.sourceScanner && <span>Detected by {data.sourceScanner}</span>}
         </div>
+        {(data.nodeType === "finding" || data.description || data.remediation || data.fileLocation) && (
+          <button type="button" className="attack-graph-copy-button" onClick={copyNodeDetails}>Copy bug</button>
+        )}
       </div>
 
       <Handle
@@ -194,6 +236,7 @@ export default function AttackGraph({
   error = "",
 }) {
   const [selectedPathId, setSelectedPathId] = useState("all");
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
 
   const { nodes, edges, paths } = useMemo(() => {
     const rawNodes = graph?.nodes || [];
@@ -275,6 +318,11 @@ export default function AttackGraph({
     (path) => path.id === selectedPathId
   );
 
+  const selectedNode = useMemo(
+    () => nodes.find((node) => node.id === selectedNodeId) || null,
+    [nodes, selectedNodeId]
+  );
+
   const selectedNodeIds = useMemo(
     () =>
       new Set(
@@ -285,17 +333,21 @@ export default function AttackGraph({
 
   const displayedNodes = useMemo(() => {
     if (!selectedPath || selectedPathId === "all") {
-      return nodes;
+      return nodes.map((node) => ({
+        ...node,
+        style: node.id === selectedNodeId ? { ...node.style, border: "2px solid var(--emerald)" } : node.style,
+      }));
     }
 
-    // Keep the full graph visible but emphasize the selected path.
     return nodes.map((node) => ({
       ...node,
       style: {
+        ...node.style,
         opacity: selectedNodeIds.has(node.id) ? 1 : 0.2,
+        border: node.id === selectedNodeId ? "2px solid var(--emerald)" : node.style?.border,
       },
     }));
-  }, [nodes, selectedPath, selectedPathId, selectedNodeIds]);
+  }, [nodes, selectedPath, selectedPathId, selectedNodeIds, selectedNodeId]);
 
   const displayedEdges = useMemo(() => {
     if (!selectedPath || selectedPathId === "all") {
@@ -321,6 +373,53 @@ export default function AttackGraph({
       };
     });
   }, [edges, selectedPath, selectedPathId]);
+
+  async function copyText(value) {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = value;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      return true;
+    } catch (error) {
+      console.error("Failed to copy attack path data", error);
+      return false;
+    }
+  }
+
+  async function handleCopySelectedPath() {
+    if (!selectedPath) return;
+    const text = [
+      `Path: ${selectedPath.title}`,
+      `Risk: ${formatLabel(selectedPath.risk_level)}`,
+      `Explanation: ${selectedPath.explanation || "No explanation provided."}`,
+      `Node IDs: ${(selectedPath.node_ids || []).join(", ")}`,
+    ].join("\n");
+    await copyText(text);
+  }
+
+  async function handleCopySelectedNode() {
+    if (!selectedNode || !selectedNode.data) return;
+    const text = [
+      `${formatLabel(selectedNode.data.nodeType)}: ${selectedNode.data.label}`,
+      `Severity: ${formatLabel(selectedNode.data.riskLevel)}`,
+      `Evidence: ${formatLabel(selectedNode.data.evidenceType)}`,
+      selectedNode.data.fileLocation ? `Location: ${selectedNode.data.fileLocation}` : null,
+      selectedNode.data.description ? `Why it matters: ${selectedNode.data.description}` : null,
+      selectedNode.data.remediation ? `Suggested review: ${selectedNode.data.remediation}` : null,
+      selectedNode.data.sourceScanner ? `Detected by: ${selectedNode.data.sourceScanner}` : null,
+    ].filter(Boolean).join("\n");
+    await copyText(text);
+  }
 
   if (loading) {
     return (
@@ -368,7 +467,10 @@ export default function AttackGraph({
           <span>Explore path</span>
           <select
             value={selectedPathId}
-            onChange={(event) => setSelectedPathId(event.target.value)}
+            onChange={(event) => {
+              setSelectedPathId(event.target.value);
+              if (event.target.value === "all") setSelectedNodeId(null);
+            }}
           >
             <option value="all">Show full graph</option>
             {paths.map((path) => (
@@ -409,6 +511,7 @@ export default function AttackGraph({
           maxZoom={2}
           nodesDraggable
           elementsSelectable
+          onNodeClick={(_, node) => setSelectedNodeId(node.id)}
           proOptions={{ hideAttribution: true }}
         >
           <Background
@@ -443,9 +546,33 @@ export default function AttackGraph({
 
           <p>{selectedPath.explanation}</p>
 
+          <div className="attack-path-actions">
+            <button type="button" className="path-copy-button" onClick={handleCopySelectedPath}>Copy selected path</button>
+          </div>
+
           <p className="path-caveat">
             This is a modeled hypothesis, not a confirmed exploit chain.
           </p>
+        </section>
+      )}
+
+      {selectedNode && selectedNode.data && (
+        <section className="attack-node-details">
+          <div className="attack-path-details-heading">
+            <div>
+              <p className="attack-path-eyebrow">SELECTED NODE</p>
+              <h3>{selectedNode.data.label}</h3>
+            </div>
+            <span className={`path-risk risk-${(selectedNode.data.riskLevel || "unknown").toLowerCase()}`}>
+              {formatLabel(selectedNode.data.riskLevel)}
+            </span>
+          </div>
+          <p>{selectedNode.data.description || "No description provided."}</p>
+          {selectedNode.data.fileLocation && <p className="node-location"><strong>Location:</strong> {selectedNode.data.fileLocation}</p>}
+          {selectedNode.data.remediation && <p className="node-remediation"><strong>Suggested review:</strong> {selectedNode.data.remediation}</p>}
+          <div className="attack-path-actions">
+            <button type="button" className="path-copy-button" onClick={handleCopySelectedNode}>Copy selected bug</button>
+          </div>
         </section>
       )}
 

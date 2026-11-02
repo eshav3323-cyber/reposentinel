@@ -238,7 +238,8 @@
   background: var(--critical-soft);
 }
 
-.attack-path-details {
+.attack-path-details,
+.attack-node-details {
   margin-top: 16px;
   padding: 18px;
   border: 1px solid var(--border);
@@ -269,17 +270,43 @@
   line-height: 1.6;
 }
 
-.attack-path-details > p {
+.attack-path-details > p,
+.attack-node-details > p {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.8;
   overflow-wrap: anywhere;
 }
 
-.attack-path-details .path-caveat {
+.attack-path-details .path-caveat,
+.node-location,
+.node-remediation {
   margin-bottom: 0;
   color: var(--amber);
   font-size: 10px;
+}
+
+.attack-path-actions {
+  display: flex;
+  justify-content: flex-start;
+  margin: 12px 0 6px;
+}
+
+.path-copy-button {
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--surface-alt);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.path-copy-button:hover {
+  background: var(--emerald-soft);
 }
 
 .path-risk {
@@ -399,6 +426,8 @@
 .attack-graph-node-tooltip p { margin: 0; color: var(--text-secondary, var(--muted)); font-size: 10px; line-height: 1.55; overflow-wrap: anywhere; }
 .attack-graph-tooltip-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 3px; }
 .attack-graph-tooltip-meta span { padding: 4px 6px; border: 1px solid var(--border-subtle, var(--border)); border-radius: 4px; color: var(--text-secondary, var(--muted)); background: var(--bg-card, var(--surface)); font-size: 9px; }
+.attack-graph-copy-button { margin-top: 4px; padding: 7px 9px; border: 1px solid var(--border-strong, var(--border)); border-radius: 5px; color: var(--text-primary, var(--ink)); background: var(--bg-card, var(--surface)); font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; cursor: pointer; }
+.attack-graph-copy-button:hover { background: var(--bg-hover, var(--surface-alt)); }
 .attack-graph-canvas .react-flow__edge-path { stroke-linecap: round; }
 .attack-graph-canvas .react-flow__edge-text { font-size: 9px; font-weight: 650; }
 .attack-graph-canvas .react-flow__edge-textbg { fill: var(--bg-card, var(--surface)); }

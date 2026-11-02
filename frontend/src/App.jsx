@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { jsPDF } from "jspdf";
+import darkLogo from "./assets/RepoSentinel Health Logo-Photoroom.svg";
+import lightLogo from "./assets/RepoSentinel Health Logo (1)-Photoroom.svg";
 import ScannerStatus from "./components/ScannerStatus";
 import AttackGraph from "./components/AttackGraph";
 import RepositoryMap from "./components/RepositoryMap";
@@ -192,7 +195,75 @@ function App() {
     </section>
   </>;
 
-  const findingsPanel = <section className="findings-panel"><div className="findings-heading"><div><h2>Security findings</h2><p>Potential issues identified by the heuristic scanner and integrated tools.</p></div><div className="finding-controls"><label className="search-control"><span className="sr-only">Search findings</span><input type="search" value={findingSearch} onChange={(event) => setFindingSearch(event.target.value)} placeholder="Search title, rule, file, or scanner" /></label><label className="filter-control"><span>Severity</span><select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value)}><option value="all">All severities</option>{["critical", "high", "medium", "low", "info"].map((severity) => <option key={severity} value={severity}>{severity[0].toUpperCase() + severity.slice(1)}</option>)}</select></label></div></div>
+  function downloadFindingsPdf() {
+    if (!visibleFindings.length) return;
+
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const margin = 40;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    let y = 60;
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.text("RepoSentinel Health Findings Report", margin, y);
+    y += 24;
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, margin, y);
+    y += 18;
+
+    visibleFindings.forEach((finding, index) => {
+      if (y > pageHeight - 110) {
+        doc.addPage();
+        y = 50;
+      }
+
+      const title = `${index + 1}. ${finding.title || "Untitled finding"}`;
+      const severity = `Severity: ${(finding.severity || "info").toUpperCase()}`;
+      const rule = `Rule: ${finding.rule_id || "unknown"}`;
+      const location = `Location: ${finding.file_path || "unknown"}${finding.line_number ? `:${finding.line_number}` : ""}`;
+      const scanner = `Scanner: ${finding.source_scanner || "unknown"}`;
+      const confidence = `Confidence: ${finding.confidence || "unknown"}`;
+      const description = finding.description || "No description provided.";
+      const remediation = finding.remediation || "No remediation details provided.";
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      const lines = doc.splitTextToSize(title, pageWidth - margin * 2);
+      doc.text(lines, margin, y);
+      y += lines.length * 14 + 8;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      const info = [severity, rule, location, scanner, confidence];
+      info.forEach((lineText) => {
+        const wrapped = doc.splitTextToSize(lineText, pageWidth - margin * 2);
+        doc.text(wrapped, margin, y);
+        y += wrapped.length * 12 + 2;
+      });
+
+      const descriptionLines = doc.splitTextToSize(`Description: ${description}`, pageWidth - margin * 2);
+      doc.text(descriptionLines, margin, y);
+      y += descriptionLines.length * 12 + 6;
+
+      const remediationLines = doc.splitTextToSize(`Recommended remediation: ${remediation}`, pageWidth - margin * 2);
+      doc.text(remediationLines, margin, y);
+      y += remediationLines.length * 12 + 14;
+
+      if (finding.redacted_evidence) {
+        const evidenceLines = doc.splitTextToSize(`Evidence: ${finding.redacted_evidence}`, pageWidth - margin * 2);
+        doc.text(evidenceLines, margin, y);
+        y += evidenceLines.length * 12 + 12;
+      }
+    });
+
+    const filename = `reposentinel-findings-${new Date().toISOString().slice(0, 10)}.pdf`;
+    doc.save(filename);
+  }
+
+  const findingsPanel = <section className="findings-panel"><div className="findings-heading"><div><h2>Security findings</h2><p>Potential issues identified by the heuristic scanner and integrated tools.</p></div><div className="finding-controls"><label className="search-control"><span className="sr-only">Search findings</span><input type="search" value={findingSearch} onChange={(event) => setFindingSearch(event.target.value)} placeholder="Search title, rule, file, or scanner" /></label><label className="filter-control"><span>Severity</span><select value={severityFilter} onChange={(event) => setSeverityFilter(event.target.value)}><option value="all">All severities</option>{["critical", "high", "medium", "low", "info"].map((severity) => <option key={severity} value={severity}>{severity[0].toUpperCase() + severity.slice(1)}</option>)}</select></label><button type="button" className="pdf-button" onClick={downloadFindingsPdf} disabled={!visibleFindings.length}>Download PDF</button></div></div>
     {!visibleFindings.length ? <div className="empty-state"><strong>{scanResult ? "No findings match these filters" : "No scan results yet"}</strong><p>{scanResult ? "Adjust your search or severity filter. An empty result does not prove the repository is free of security issues." : "Run a scan to review repository findings here."}</p>{!scanResult && <button className="primary-button" onClick={() => navigate("scan")}>Start a scan</button>}</div> : <div className="findings-list">{visibleFindings.map((finding) => <article className="finding-card" key={finding.id}><div className="finding-topline"><span className={`severity-badge severity-${(finding.severity || "info").toLowerCase()}`}>{(finding.severity || "UNKNOWN").toUpperCase()}</span><span className="finding-rule">{finding.rule_id}</span><span className="finding-confidence">Confidence: {finding.confidence || "unknown"}</span></div><h3>{finding.title}</h3><p className="finding-description">{finding.description}</p><div className="finding-location"><code>{finding.file_path}{finding.line_number ? `:${finding.line_number}` : ""}</code><span>{finding.source_scanner}</span></div>{finding.redacted_evidence && <div className="evidence-block"><span>Redacted evidence</span><code>{finding.redacted_evidence}</code></div>}{finding.remediation && <div className="remediation-block"><strong>Suggested remediation</strong><p>{finding.remediation}</p></div>}<p className="finding-disclaimer">Detection type: {finding.detection_type || "unknown"}. Review this result manually before treating it as a confirmed vulnerability.</p></article>)}</div>}</section>;
 
   const remediationPanel = <section className="remediation-panel"><div className="remediation-heading"><div><p className="eyebrow">HUMAN REVIEW WORKFLOW</p><h2>Minimal remediation plan</h2><p>Candidate fixes ranked to cover modeled paths first, within a review budget.</p></div>{scanResult && <div className="remediation-budget"><label htmlFor="remediation-budget">Recommendation budget</label><select id="remediation-budget" value={remediationBudget} onChange={(event) => { const value = Number(event.target.value); setRemediationBudget(value); void refreshRemediation(value); }}>{[1, 3, 5, 10, 25].map((value) => <option key={value} value={value}>{value} fixes</option>)}</select><button type="button" className="retry-button" onClick={() => refreshRemediation()} disabled={remediationLoading}>{remediationLoading ? "Updating…" : "Update plan"}</button></div>}</div>
@@ -203,7 +274,9 @@ function App() {
 
   return <div className="app-shell product-shell" data-theme={theme}>
     <aside className={`sidebar ${mobileNavOpen ? "sidebar-open" : ""}`}>
-      <a className="brand" href="#overview" onClick={() => { navigate("overview"); setMobileNavOpen(false); }}><span className="brand-icon">RS</span><span><strong>RepoSentinel</strong><small>HEALTH SECURITY</small></span></a>
+      <a className="brand" href="#overview" onClick={() => { navigate("overview"); setMobileNavOpen(false); }}>
+        <img className="brand-logo" src={theme === "dark" ? darkLogo : lightLogo} alt="RepoSentinel Health logo" />
+      </a>
       <div className="sidebar-caption">WORKSPACE</div><nav aria-label="Primary navigation">{NAV.map((item) => <button key={item.id} className={`nav-item ${activeView === item.id ? "active" : ""}`} onClick={() => { navigate(item.id); setMobileNavOpen(false); }}><span className="nav-icon"><NavIcon name={item.icon} /></span><span>{item.label}</span>{item.id === "findings" && findings.length > 0 && <b className="nav-count">{findings.length}</b>}</button>)}</nav>
       <div className="sidebar-spacer" /><div className="sidebar-connection"><span className={`status-dot ${health?.status === "healthy" ? "online" : ""}`} /><div><strong>{health?.status === "healthy" ? "Backend healthy" : backend ? "API responding" : loading ? "Connecting" : "API offline"}</strong><small>{backend?.version ? `Backend v${backend.version}` : "FastAPI service"}</small></div></div><div className="sidebar-foot">DEFENSIVE ANALYSIS · LOCAL WORKSPACE</div>
     </aside>
@@ -229,6 +302,39 @@ function App() {
         {activeView === "evaluation" && <><section className="workspace-heading"><div><p className="eyebrow">VALIDATION WORKSPACE</p><h1>Evaluation</h1><p>Review RepoSentinel’s synthetic scanner evaluation outputs and their stated limitations.</p></div><span className="live-label">LOCAL CLI RUNNER</span></section><section className="evaluation-unavailable"><span className="evaluation-mark">CLI</span><div><h2>No evaluation API is connected</h2><p>The bundled evaluation runner reads synthetic fixtures from the backend workspace and writes local JSON and Markdown reports. This frontend cannot start a run or fetch those files through the current API.</p><div className="evaluation-command"><span>From the backend directory</span><code>python -m app.core.evaluation</code></div><p className="evaluation-caveat">Use the backend’s documented evaluation command and inspect its generated report. Scanner availability, skipped categories, and synthetic dataset limits should be reviewed with each run. No evaluation metrics are shown here because none are provided by a frontend API.</p></div></section></>}
         <footer className="dashboard-footer"><span>RepoSentinel Health · Version 0.1.0</span><span>Defensive repository analysis · Local workspace</span></footer>
       </main>
+      <footer className="site-footer">
+        <div className="footer-grid">
+          <div className="footer-brand">
+            <img className="footer-logo" src={theme === "dark" ? darkLogo : lightLogo} alt="RepoSentinel Health logo" />
+          </div>
+
+          <div className="footer-column">
+            <h3>Platform</h3>
+            <ul>
+              <li><a href="#overview" onClick={(event) => { event.preventDefault(); navigate("overview"); }}>Overview</a></li>
+              <li><a href="#scan" onClick={(event) => { event.preventDefault(); navigate("scan"); }}>Repository scans</a></li>
+              <li><a href="#findings" onClick={(event) => { event.preventDefault(); navigate("findings"); }}>Findings</a></li>
+              <li><a href="#remediation" onClick={(event) => { event.preventDefault(); navigate("remediation"); }}>Remediation</a></li>
+            </ul>
+          </div>
+
+          <div className="footer-column">
+            <h3>Why teams trust it</h3>
+            <p>Human-reviewed analysis for secure repository triage, actionable findings, and faster remediation planning.</p>
+          </div>
+
+          <div className="footer-column">
+            <h3>Contact</h3>
+            <a href="mailto:security@reposentinel.io">security@reposentinel.io</a>
+            <a href="tel:+18005550190">+1 (800) 555-0190</a>
+          </div>
+        </div>
+
+        <div className="footer-bottom">
+          <span>© 2026 RepoSentinel Health</span>
+          <span>Defensive repository analysis · local workspace</span>
+        </div>
+      </footer>
     </div>
   </div>;
 }

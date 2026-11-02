@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   Background,
   Controls,
@@ -85,12 +85,50 @@ function TreeItems({ node }) {
   );
 }
 
+function serializeTree(node, prefix = "", connector = "") {
+  const lines = [`${prefix}${connector}${node.name}`];
+  const children = [...node.children.values()]
+    .sort((a, b) => a.type.localeCompare(b.type) || a.name.localeCompare(b.name));
+
+  children.forEach((child, index) => {
+    const childConnector = index === children.length - 1 ? "└─ " : "├─ ";
+    const childPrefix = prefix + (connector ? "   " : "");
+    lines.push(serializeTree(child, childPrefix, childConnector));
+  });
+
+  return lines.join("\n");
+}
+
 export default function RepositoryMap({ findings = [] }) {
+  const [copied, setCopied] = useState(false);
   const paths = useMemo(() => [...new Set(
     findings.map((finding) => cleanPath(finding.file_path)).filter((path) => path && path !== "unknown")
   )].sort(), [findings]);
   const tree = useMemo(() => makeTree(paths), [paths]);
   const graph = useMemo(() => makeGraph(tree), [tree]);
+  const treeText = useMemo(() => serializeTree(tree), [tree]);
+
+  async function handleCopyTree() {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(treeText);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = treeText;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (error) {
+      console.error("Failed to copy repository tree", error);
+    }
+  }
 
   if (!paths.length) {
     return <div className="empty-state repository-map-empty"><strong>No file paths were returned with this scan</strong><p>The backend currently reports the number of analyzed files but does not expose their complete inventory. This view only maps file paths attached to actual findings.</p></div>;
@@ -114,7 +152,13 @@ export default function RepositoryMap({ findings = [] }) {
           </div>
         </section>
         <section className="repository-map-panel repository-map-tree-panel">
-          <div className="repository-map-heading"><div><p className="eyebrow">SIMPLE FORMAT</p><h2>Folder tree</h2></div><span>{paths.length} files</span></div>
+          <div className="repository-map-heading">
+            <div><p className="eyebrow">SIMPLE FORMAT</p><h2>Folder tree</h2></div>
+            <div className="repository-map-actions">
+              <span>{paths.length} files</span>
+              <button type="button" className="copy-tree-button" onClick={handleCopyTree} aria-live="polite">{copied ? "Copied" : "Copy structure"}</button>
+            </div>
+          </div>
           <div className="repository-tree-scroll"><ul className="repository-tree"><TreeItems node={tree} /></ul></div>
         </section>
       </div>
