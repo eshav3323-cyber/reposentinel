@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
-import darkLogo from "./assets/RepoSentinel Health Logo-Photoroom.svg";
-import lightLogo from "./assets/RepoSentinel Health Logo (1)-Photoroom.svg";
+import darkLogo from "./assets/RepoSentinel_Health_Logo-removebg-preview.png";
+import lightLogo from "./assets/RepoSentinel_Health_Logo__1_-removebg-preview.png";
+import heroImage from "./assets/Secure Your Code Repositories (1).png";
+import darkHeroImage from "./assets/RepoSentinel Health Dashboard.png";
 import ScannerStatus from "./components/ScannerStatus";
 import AttackGraph from "./components/AttackGraph";
 import RepositoryMap from "./components/RepositoryMap";
@@ -71,6 +73,7 @@ function App() {
   const [remediationError, setRemediationError] = useState("");
   const [remediationBudget, setRemediationBudget] = useState(5);
   const summary = scanResult?.summary;
+  const heroVisual = theme === "dark" ? darkHeroImage : heroImage;
 
   function toggleTheme() {
     setTheme((current) => {
@@ -286,6 +289,30 @@ function App() {
         {error && <div className="error-banner" role="alert"><div><strong>Backend connection issue</strong><p>{error}</p></div><button onClick={() => loadBackend()} className="retry-button" disabled={loading}>{loading ? "Connecting…" : "Retry connection"}</button></div>}
         {activeView === "overview" && <>
           <section className="workspace-heading overview-heading"><div><p className="eyebrow">SECURITY OPERATIONS WORKSPACE</p><h1>Security Overview</h1><p>Monitor repository security, investigate findings, and prioritize remediation.</p></div><button className="primary-button" onClick={() => navigate("scan")}>New Repository Scan</button></section>
+          <section className="hero-section" aria-label="RepoSentinel overview hero">
+            <div className="hero-visual">
+              <div className="hero-frame">
+                <img src={heroVisual} alt="RepoSentinel security dashboard preview" />
+                <div className="hero-overlay">
+                  <button className="primary-button hero-inline-button" onClick={() => navigate("scan")}>Scan Repository</button>
+                </div>
+              </div>
+            </div>
+            <div className="hero-copy">
+              <span className="eyebrow hero-eyebrow">SECURE EVERY DEPLOYMENT</span>
+              <h2>See repository risk before it becomes a breach.</h2>
+              <p>RepoSentinel turns noisy scanner output into a clear operational view of exposed paths, high-risk findings, and the remediation work that matters most.</p>
+              <div className="hero-actions">
+                <button className="primary-button" onClick={() => navigate("scan")}>Scan repository</button>
+                <button className="secondary-button" onClick={() => navigate("paths")}>View attack paths</button>
+              </div>
+              <ul className="hero-metrics">
+                <li><strong>Repository graph</strong><span>Map attack paths and dependencies</span></li>
+                <li><strong>Prioritized fixes</strong><span>Ranked remediation candidates</span></li>
+                <li><strong>Human review</strong><span>Structured evidence and traceability</span></li>
+              </ul>
+            </div>
+          </section>
           <section className="overview-meta"><div><span className="meta-label">CURRENT PROJECT</span><strong>{scanResult?.filename || "No repository selected"}</strong></div><div><span className="meta-label">LATEST SCAN</span><strong>{scanResult ? new Date(scanResult.created_at).toLocaleString() : "Awaiting first scan"}</strong></div><div><span className="meta-label">SCAN DURATION</span><strong>{scanResult ? `${scanResult.duration_ms ?? 0} ms` : "—"}</strong></div><div><span className="meta-label">SCAN ID</span><strong className="mono">{scanResult?.scan_id || "—"}</strong></div></section>
           <section className="section-heading"><div><h2>Risk overview</h2><p>Latest repository scan · findings are indicators for human review</p></div><span className="live-label">{scanResult ? "LATEST RESULT" : "NO SCAN YET"}</span></section>
           <section className="summary-grid overview-risk-grid"><article className="summary-card total"><span>Total findings</span><strong>{summary?.total_findings ?? "—"}</strong></article><article className="summary-card critical"><span>Critical</span><strong>{summary?.critical ?? "—"}</strong></article><article className="summary-card high"><span>High</span><strong>{summary?.high ?? "—"}</strong></article><article className="summary-card medium"><span>Medium</span><strong>{summary?.medium ?? "—"}</strong></article><article className="summary-card low"><span>Low</span><strong>{summary?.low ?? "—"}</strong></article><article className="summary-card info"><span>Files analyzed</span><strong>{summary?.files_analyzed ?? "—"}</strong></article></section>
