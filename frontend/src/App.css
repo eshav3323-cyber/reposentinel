@@ -829,6 +829,27 @@ a {
   object-fit: contain;
 }
 
+.product-shell[data-theme="dark"] .hero-visual {
+  padding: 0;
+}
+
+.product-shell[data-theme="dark"] .hero-frame {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  border-radius: 0;
+  background: linear-gradient(90deg, rgba(6, 9, 17, 0.2) 0%, rgba(56, 38, 88, 0.16) 28%, rgba(92, 71, 150, 0.12) 52%, rgba(56, 38, 88, 0.16) 76%, rgba(6, 9, 17, 0.2) 100%);
+  box-shadow: none;
+}
+
+.product-shell[data-theme="dark"] .hero-frame img {
+  width: 100%;
+  max-width: none;
+  object-fit: cover;
+  transform: scale(1.04);
+  filter: saturate(1.2) contrast(1.08);
+}
+
 .hero-frame::before {
   content: "";
   position: absolute;

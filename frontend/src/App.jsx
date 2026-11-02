@@ -288,7 +288,6 @@ function App() {
       <main className="dashboard workspace-dashboard">
         {error && <div className="error-banner" role="alert"><div><strong>Backend connection issue</strong><p>{error}</p></div><button onClick={() => loadBackend()} className="retry-button" disabled={loading}>{loading ? "Connecting…" : "Retry connection"}</button></div>}
         {activeView === "overview" && <>
-          <section className="workspace-heading overview-heading"><div><p className="eyebrow">SECURITY OPERATIONS WORKSPACE</p><h1>Security Overview</h1><p>Monitor repository security, investigate findings, and prioritize remediation.</p></div><button className="primary-button" onClick={() => navigate("scan")}>New Repository Scan</button></section>
           <section className="hero-section" aria-label="RepoSentinel overview hero">
             <div className="hero-visual">
               <div className="hero-frame">
@@ -313,6 +312,7 @@ function App() {
               </ul>
             </div>
           </section>
+          <section className="workspace-heading overview-heading"><div><p className="eyebrow">SECURITY OPERATIONS WORKSPACE</p><h1>Security Overview</h1><p>Monitor repository security, investigate findings, and prioritize remediation.</p></div><button className="primary-button" onClick={() => navigate("scan")}>New Repository Scan</button></section>
           <section className="overview-meta"><div><span className="meta-label">CURRENT PROJECT</span><strong>{scanResult?.filename || "No repository selected"}</strong></div><div><span className="meta-label">LATEST SCAN</span><strong>{scanResult ? new Date(scanResult.created_at).toLocaleString() : "Awaiting first scan"}</strong></div><div><span className="meta-label">SCAN DURATION</span><strong>{scanResult ? `${scanResult.duration_ms ?? 0} ms` : "—"}</strong></div><div><span className="meta-label">SCAN ID</span><strong className="mono">{scanResult?.scan_id || "—"}</strong></div></section>
           <section className="section-heading"><div><h2>Risk overview</h2><p>Latest repository scan · findings are indicators for human review</p></div><span className="live-label">{scanResult ? "LATEST RESULT" : "NO SCAN YET"}</span></section>
           <section className="summary-grid overview-risk-grid"><article className="summary-card total"><span>Total findings</span><strong>{summary?.total_findings ?? "—"}</strong></article><article className="summary-card critical"><span>Critical</span><strong>{summary?.critical ?? "—"}</strong></article><article className="summary-card high"><span>High</span><strong>{summary?.high ?? "—"}</strong></article><article className="summary-card medium"><span>Medium</span><strong>{summary?.medium ?? "—"}</strong></article><article className="summary-card low"><span>Low</span><strong>{summary?.low ?? "—"}</strong></article><article className="summary-card info"><span>Files analyzed</span><strong>{summary?.files_analyzed ?? "—"}</strong></article></section>
