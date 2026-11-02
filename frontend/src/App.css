@@ -78,6 +78,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-x: hidden;
   background: var(--ivory);
 }
 
@@ -431,16 +432,19 @@ a {
 }
 
 .site-footer {
-  margin-top: 36px;
+  margin: 36px auto 0;
+  max-width: 1440px;
   padding: 28px 32px 18px;
-  border-top: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.02));
+  border: 1px solid rgba(112, 94, 151, 0.12);
+  border-radius: 22px 22px 0 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(245, 243, 255, 0.7));
+  box-shadow: 0 -8px 30px rgba(86, 30, 232, 0.04);
 }
 
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.4fr 0.9fr 1.1fr 1fr;
-  gap: 24px;
+  grid-template-columns: 1.3fr 0.8fr 1.1fr 0.9fr;
+  gap: 28px;
   align-items: start;
 }
 
@@ -487,19 +491,23 @@ a {
 .footer-column {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+}
+
+.footer-about-column {
+  margin-top: 0;
 }
 
 .footer-column h3 {
-  margin-bottom: 2px;
+  margin-bottom: 0;
   font-size: 12px;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .footer-column ul {
   display: grid;
-  gap: 7px;
+  gap: 8px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -511,6 +519,60 @@ a {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.7;
+}
+
+.footer-column li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-left: 2px solid rgba(86, 30, 232, 0.28);
+  border-radius: 0 10px 10px 0;
+  background: rgba(118, 61, 247, 0.03);
+}
+
+.footer-column a {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border-left: 2px solid rgba(86, 30, 232, 0.28);
+  border-radius: 0 10px 10px 0;
+  background: rgba(118, 61, 247, 0.03);
+}
+
+.about-us-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.about-us-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 8px 12px;
+  border-left: 2px solid rgba(86, 30, 232, 0.28);
+  border-radius: 0 10px 10px 0;
+  background: rgba(118, 61, 247, 0.03);
+}
+
+.about-us-list span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.about-us-list small {
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.02em;
 }
 
 .footer-column a {
@@ -2487,13 +2549,45 @@ button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-
   .overview-columns { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
-  .sidebar { position: fixed; inset: 0 auto 0 0; display: flex; width: min(290px, 86vw); min-height: 100vh; align-items: stretch; flex-direction: column; gap: 0; padding: 22px 16px 18px; }
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 40;
+    display: flex;
+    width: min(290px, 86vw);
+    min-height: 100vh;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 0;
+    padding: 22px 16px 18px;
+    transform: translateX(-104%);
+    opacity: 0;
+    visibility: hidden;
+    transition: transform 0.22s ease, opacity 0.2s ease, visibility 0.2s ease;
+    box-shadow: 12px 0 35px rgba(20, 48, 34, 0.15);
+  }
+  .sidebar.sidebar-open {
+    transform: translateX(0);
+    opacity: 1;
+    visibility: visible;
+  }
   .sidebar .brand { padding: 0 5px 22px; }
   .sidebar nav { display: grid; height: auto; flex: 0 0 auto; align-self: stretch; gap: 4px; overflow: visible; border: 0; }
   .nav-item { display: flex; width: 100%; min-height: 42px; justify-content: flex-start; padding: 0 11px; border-radius: 5px; }
   .sidebar-connection { display: flex; justify-self: auto; margin: auto 0 0; padding: 12px 10px; border: 1px solid var(--border-subtle); border-radius: 5px; }
   .mobile-menu { display: inline-grid; }
-  .product-topbar { gap: 8px; padding-right: 12px; padding-left: 12px; }
+  .nav-scrim { position: fixed; inset: 0; z-index: 35; display: block; border: 0; background: rgba(22, 42, 31, 0.35); }
+  .product-topbar {
+    gap: 8px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+  .breadcrumb {
+    max-width: calc(100% - 120px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .theme-toggle { margin-left: 0; }
   .product-topbar .environment { margin-left: 0; font-size: 0; }
   .product-topbar .environment .status-dot { margin: 0; }

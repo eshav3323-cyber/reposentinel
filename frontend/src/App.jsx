@@ -346,14 +346,19 @@ function App() {
           </div>
 
           <div className="footer-column">
-            <h3>Why teams trust it</h3>
-            <p>Human-reviewed analysis for secure repository triage, actionable findings, and faster remediation planning.</p>
-          </div>
-
-          <div className="footer-column">
             <h3>Contact</h3>
             <a href="mailto:security@reposentinel.io">security@reposentinel.io</a>
             <a href="tel:+18005550190">+1 (800) 555-0190</a>
+          </div>
+
+          <div className="footer-column footer-about-column">
+            <h3>About us</h3>
+            <ul className="about-us-list">
+              <li><span>Eshav</span><small>Main developer</small></li>
+              <li><span>Manjot</span><small>Co-developer and presenter</small></li>
+              <li><span>Dilshan</span><small>Presenter</small></li>
+              <li><span>Twinkle</span><small>Presenter</small></li>
+            </ul>
           </div>
         </div>
 
