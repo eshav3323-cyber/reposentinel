@@ -289,14 +289,6 @@ function App() {
         {error && <div className="error-banner" role="alert"><div><strong>Backend connection issue</strong><p>{error}</p></div><button onClick={() => loadBackend()} className="retry-button" disabled={loading}>{loading ? "Connecting…" : "Retry connection"}</button></div>}
         {activeView === "overview" && <>
           <section className="hero-section" aria-label="RepoSentinel overview hero">
-            <div className="hero-visual">
-              <div className="hero-frame">
-                <img src={heroVisual} alt="RepoSentinel security dashboard preview" />
-                <div className="hero-overlay">
-                  <button className="primary-button hero-inline-button" onClick={() => navigate("scan")}>Scan Repository</button>
-                </div>
-              </div>
-            </div>
             <div className="hero-copy">
               <span className="eyebrow hero-eyebrow">SECURE EVERY DEPLOYMENT</span>
               <h2>See repository risk before it becomes a breach.</h2>

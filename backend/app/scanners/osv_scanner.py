@@ -241,12 +241,12 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
 
             if not report_path.is_file():
                 detail = (completed.stderr or completed.stdout or "").strip()
-                detail = detail[-1000:]
-                raise OsvScanError(
-                    "OSV-Scanner did not produce a JSON report."
-                    + (f" Scanner output: {detail}" if detail else "")
-                )
 
+                raise OsvScanError(
+                    f"OSV-Scanner did not produce a JSON report. "
+                    f"Exit code: {completed.returncode}. "
+                    f"Output: {detail[-2000:] or 'No output received.'}"
+                )
             try:
                 if report_path.stat().st_size > MAX_REPORT_SIZE:
                     raise OsvScanError(
