@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import subprocess
 import tempfile
@@ -157,6 +156,7 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
     Only validated dependency text files are written to a temporary
     directory. Uploaded application code is never executed or installed.
     """
+
     candidates = [
         item
         for item in source_files
@@ -167,6 +167,7 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
         return []
 
     executable = _find_osv_executable()
+
     if not executable:
         raise OsvScanError(
             "OSV-Scanner was not found. Check that it is installed "
@@ -179,6 +180,7 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
     with tempfile.TemporaryDirectory(prefix="reposentinel-osv-") as temp:
         root = Path(temp).resolve()
 
+        # Copy only recognized dependency files into the temporary folder.
         for item in candidates:
             relative = Path(item.path)
 
@@ -197,25 +199,14 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(item.content, encoding="utf-8")
 
-        # Keep the report outside the scanned directory.
-        report_handle = tempfile.NamedTemporaryFile(
-            prefix="reposentinel-osv-",
-            suffix=".json",
-            delete=False,
-        )
-        report_path = Path(report_handle.name)
-        report_handle.close()
-        report_path.unlink(missing_ok=True)
-
+        # OSV-Scanner v1.9.2 writes JSON to stdout.
+        # Do not use the v2-only "scan source" or "--output-file" arguments.
         command = [
-        executable,
-        "scan",
-        "--recursive",
-        "--format",
-        "json",
-        "--output-file",
-        str(report_path),
-        str(root),
+            executable,
+            "--recursive",
+            "--format",
+            "json",
+            str(root),
         ]
 
         try:
@@ -229,35 +220,47 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                     shell=False,
                     cwd=str(root),
                 )
+
             except subprocess.TimeoutExpired as exc:
                 raise OsvScanError(
                     "OSV-Scanner timed out while checking dependencies."
                 ) from exc
+
             except OSError as exc:
                 raise OsvScanError(
                     "OSV-Scanner could not be started."
                 ) from exc
 
-            if not report_path.is_file():
-                detail = (completed.stderr or completed.stdout or "").strip()
+            # JSON is expected on stdout for OSV-Scanner v1.
+            report_text = completed.stdout or ""
+
+            if not report_text.strip():
+                detail = (
+                    completed.stderr or completed.stdout or ""
+                ).strip()
 
                 raise OsvScanError(
-                    f"OSV-Scanner did not produce a JSON report. "
+                    "OSV-Scanner did not produce JSON output. "
                     f"Exit code: {completed.returncode}. "
                     f"Output: {detail[-2000:] or 'No output received.'}"
                 )
-            try:
-                if report_path.stat().st_size > MAX_REPORT_SIZE:
-                    raise OsvScanError(
-                        "OSV-Scanner report exceeded the size limit."
-                    )
 
-                report = json.loads(
-                    report_path.read_text(encoding="utf-8")
-                )
-            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            if len(report_text.encode("utf-8")) > MAX_REPORT_SIZE:
                 raise OsvScanError(
-                    "OSV-Scanner produced an unreadable JSON report."
+                    "OSV-Scanner report exceeded the size limit."
+                )
+
+            try:
+                report = json.loads(report_text)
+
+            except json.JSONDecodeError as exc:
+                detail = (
+                    completed.stderr or completed.stdout or ""
+                ).strip()
+
+                raise OsvScanError(
+                    "OSV-Scanner produced invalid JSON. "
+                    f"Output: {detail[-1000:] or 'No details available.'}"
                 ) from exc
 
             if not isinstance(report, dict):
@@ -266,25 +269,35 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                 )
 
             results = report.get("results", [])
+
             if not isinstance(results, list):
                 raise OsvScanError(
                     "OSV-Scanner report has an invalid results field."
                 )
 
-            # A nonzero exit code can accompany findings. A missing or
-            # malformed report is handled separately above.
+            # A nonzero exit code can accompany findings.
+            # A missing or malformed report is handled separately above.
             if completed.returncode != 0 and not results:
-                detail = (completed.stderr or completed.stdout or "").strip()
+                detail = (
+                    completed.stderr or completed.stdout or ""
+                ).strip()
+
                 raise OsvScanError(
                     "OSV-Scanner did not complete successfully."
-                    + (f" Scanner output: {detail[-1000:]}" if detail else "")
+                    + (
+                        f" Scanner output: {detail[-1000:]}"
+                        if detail
+                        else ""
+                    )
                 )
 
+            # Process OSV results.
             for result in results:
                 if not isinstance(result, dict):
                     continue
 
                 source = result.get("source") or {}
+
                 source_path = _first_text(
                     source.get("path") if isinstance(source, dict) else "",
                     result.get("sourcePath"),
@@ -292,6 +305,7 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                 )
 
                 packages = result.get("packages") or []
+
                 if not isinstance(packages, list):
                     continue
 
@@ -300,20 +314,27 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                         continue
 
                     package_info = package.get("package") or {}
+
                     if not isinstance(package_info, dict):
                         continue
 
                     package_name = _first_text(
-                        package_info.get("name"), "unknown package"
+                        package_info.get("name"),
+                        "unknown package",
                     )
+
                     package_version = _first_text(
-                        package_info.get("version"), "unknown"
+                        package_info.get("version"),
+                        "unknown",
                     )
+
                     ecosystem = _first_text(
-                        package_info.get("ecosystem"), "unknown"
+                        package_info.get("ecosystem"),
+                        "unknown",
                     )
 
                     vulnerabilities = package.get("vulnerabilities") or []
+
                     if not isinstance(vulnerabilities, list):
                         continue
 
@@ -322,8 +343,10 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                             continue
 
                         vuln_id = _first_text(
-                            vulnerability.get("id"), "OSV-UNKNOWN"
+                            vulnerability.get("id"),
+                            "OSV-UNKNOWN",
                         )
+
                         aliases = _aliases(vulnerability)
 
                         dedup_key = _deduplication_key(
@@ -335,6 +358,7 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
 
                         if dedup_key in seen:
                             continue
+
                         seen.add(dedup_key)
 
                         summary = _first_text(
@@ -387,9 +411,7 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                         )
 
         finally:
-            try:
-                report_path.unlink(missing_ok=True)
-            except OSError:
-                pass
+            # TemporaryDirectory automatically removes the scanned files.
+            pass
 
     return findings
