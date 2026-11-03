@@ -208,15 +208,14 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
         report_path.unlink(missing_ok=True)
 
         command = [
-            executable,
-            "scan",
-            "source",
-            "--recursive",
-            "--format",
-            "json",
-            "--output-file",
-            str(report_path),
-            str(root),
+        executable,
+        "scan",
+        "--recursive",
+        "--format",
+        "json",
+        "--output-file",
+        str(report_path),
+        str(root),
         ]
 
         try:
