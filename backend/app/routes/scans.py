@@ -2,6 +2,7 @@
 import asyncio
 from time import perf_counter
 from datetime import datetime, timezone
+from unicodedata import name
 from uuid import uuid4
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
@@ -187,15 +188,22 @@ async def scan_repository(file: UploadFile = File(...)):
                     (perf_counter() - started) * 1000
                 ),
             }
-        except Exception:
+        except Exception as exc:
+            error_message = str(exc).strip()
+
             return name, [], {
-                "status": "failed",
-                "findings": 0,
-                "error": f"{name} could not complete the scan.",
-                "duration_ms": round(
-                    (perf_counter() - started) * 1000
-                ),
-            }
+            "status": "failed",
+            "findings": 0,
+            "error": (
+            f"{type(exc).__name__}: "
+            f"{error_message[:1500]}"
+            if error_message
+            else f"{name} could not complete the scan."
+        ),
+        "duration_ms": round(
+            (perf_counter() - started) * 1000
+        ),
+    }
 
     outcomes = await asyncio.gather(*(
         run_scanner(name, function, expected_error)
