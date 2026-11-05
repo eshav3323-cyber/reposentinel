@@ -84,6 +84,16 @@
     }, 180000);
   }
 
+  export function scanGitHubRepository(repositoryUrl) {
+    return request("/api/scans/github", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ repository_url: repositoryUrl }),
+    }, 180000);
+  }
+
   export function getScanFindings(scanId) {
     return request(
       `/api/scans/${encodeURIComponent(scanId)}/findings`

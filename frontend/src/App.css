@@ -653,6 +653,66 @@ a {
   font-size: 11px;
 }
 
+.scan-mode-switch {
+  display: inline-flex;
+  gap: 10px;
+  padding: 6px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-alt);
+}
+
+.scan-mode-button {
+  padding: 9px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.scan-mode-button.active {
+  border-color: var(--accent-border);
+  background: var(--accent-surface);
+  color: var(--accent-primary);
+}
+
+.github-url-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.github-url-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.github-url-input {
+  width: 100%;
+  padding: 14px 15px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-alt);
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.github-url-input:focus {
+  outline: 2px solid rgba(118, 61, 247, 0.18);
+  border-color: var(--accent-primary);
+}
+
 .upload-icon {
   display: grid;
   place-items: center;

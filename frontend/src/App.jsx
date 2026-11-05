@@ -7,7 +7,7 @@ import darkHeroImage from "./assets/RepoSentinel Health Dashboard.png";
 import ScannerStatus from "./components/ScannerStatus";
 import AttackGraph from "./components/AttackGraph";
 import RepositoryMap from "./components/RepositoryMap";
-import { getBackendStatus, uploadRepository, getScan, getScanFindings, getAttackGraph, getScanRemediation } from "./services/api";
+import { getBackendStatus, uploadRepository, scanGitHubRepository, getScan, getScanFindings, getAttackGraph, getScanRemediation } from "./services/api";
 import "./App.css";
 
 const NAV = [
@@ -58,6 +58,8 @@ function App() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [scanInputMode, setScanInputMode] = useState("zip");
+  const [githubUrl, setGithubUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [scanError, setScanError] = useState("");
   const [scanResult, setScanResult] = useState(null);
@@ -147,19 +149,63 @@ function App() {
 
   async function handleScanSubmit(event) {
     event.preventDefault();
-    if (!selectedFile || uploading) return;
-    setUploading(true); setScanError(""); setScanResult(null); setFindings([]); setAttackGraph(null); setGraphError(""); setRemediation(null); setRemediationError("");
+    if (uploading) return;
+
+    if (scanInputMode === "zip" && !selectedFile) {
+      setScanError("Please choose a repository ZIP file.");
+      return;
+    }
+
+    if (scanInputMode === "github" && !githubUrl.trim()) {
+      setScanError("Please enter a public GitHub repository URL.");
+      return;
+    }
+
+    setUploading(true);
+    setScanError("");
+    setScanResult(null);
+    setFindings([]);
+    setAttackGraph(null);
+    setGraphError("");
+    setRemediation(null);
+    setRemediationError("");
+
     try {
-      const result = await uploadRepository(selectedFile);
+      const result = scanInputMode === "github"
+        ? await scanGitHubRepository(githubUrl.trim())
+        : await uploadRepository(selectedFile);
+
       window.sessionStorage.setItem("reposentinel.latestScanId", result.scan_id);
-      setScanResult(result); setFindings(result.findings || []);
-      setGraphLoading(true); setRemediationLoading(true);
-      const [graph, plan] = await Promise.allSettled([getAttackGraph(result.scan_id), getScanRemediation(result.scan_id, remediationBudget)]);
-      if (graph.status === "fulfilled") setAttackGraph(graph.value); else setGraphError(graph.reason?.message || "The attack graph could not be loaded.");
-      if (plan.status === "fulfilled") setRemediation(plan.value); else setRemediationError(plan.reason?.message || "Remediation recommendations could not be loaded.");
+      setScanResult(result);
+      setFindings(result.findings || []);
+      setGraphLoading(true);
+      setRemediationLoading(true);
+
+      const [graph, plan] = await Promise.allSettled([
+        getAttackGraph(result.scan_id),
+        getScanRemediation(result.scan_id, remediationBudget),
+      ]);
+
+      if (graph.status === "fulfilled") {
+        setAttackGraph(graph.value);
+      } else {
+        setGraphError(graph.reason?.message || "The attack graph could not be loaded.");
+      }
+
+      if (plan.status === "fulfilled") {
+        setRemediation(plan.value);
+      } else {
+        setRemediationError(plan.reason?.message || "Remediation recommendations could not be loaded.");
+      }
+
       navigate("findings");
-    } catch (err) { setScanError(err.message || "The repository scan failed."); }
-    finally { setUploading(false); setGraphLoading(false); setRemediationLoading(false); }
+    } catch (err) {
+      setScanError(err.message || "The repository scan failed.");
+    } finally {
+      setUploading(false);
+      setGraphLoading(false);
+      setRemediationLoading(false);
+    }
   }
 
   const visibleFindings = useMemo(() => findings.filter((item) => {
@@ -187,13 +233,73 @@ function App() {
 
   const page = NAV.find((item) => item.id === activeView);
   const scanPanel = <>
-    <section className="workspace-heading"><div><p className="eyebrow">AUTHORIZED REPOSITORY ANALYSIS</p><h1>Repository scan</h1><p>Upload a repository archive for safe, in-memory analysis. Source code is never executed.</p></div><span className="live-label">ZIP · MAX 20 MB</span></section>
-    <section className="upload-panel"><form onSubmit={handleScanSubmit}>
-      <label className="upload-dropzone" htmlFor="repository-zip"><span className="upload-icon" aria-hidden="true"><NavIcon name="upload" /></span><strong>{selectedFile ? selectedFile.name : "Choose a repository ZIP"}</strong><span>{selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB selected` : "Select a .zip file from your computer"}</span><input id="repository-zip" type="file" accept=".zip,application/zip" onChange={handleFileChange} disabled={uploading} /></label>
-      <div className="upload-actions"><p>Only scan repositories you own or are authorized to assess.</p><button className="primary-button" type="submit" disabled={!selectedFile || uploading}>{uploading ? "Scanning repository…" : "Run security scan"}</button></div>
-    </form>
-    {uploading && <div className="progress-message" role="status"><span className="loading-spinner" />Validating the ZIP archive and running available scanners…</div>}
-    {scanError && <div className="scan-error" role="alert"><strong>Scan issue</strong><p>{scanError}</p></div>}
+    <section className="workspace-heading">
+      <div>
+        <p className="eyebrow">AUTHORIZED REPOSITORY ANALYSIS</p>
+        <h1>Repository scan</h1>
+        <p>Scan a public GitHub repository or upload a ZIP archive. Source code is never executed.</p>
+      </div>
+      <span className="live-label">{scanInputMode === "github" ? "GITHUB · PUBLIC" : "ZIP · MAX 20 MB"}</span>
+    </section>
+
+    <section className="upload-panel">
+      <div className="scan-mode-switch" role="tablist" aria-label="Repository input method">
+        <button
+          type="button"
+          className={scanInputMode === "zip" ? "scan-mode-button active" : "scan-mode-button"}
+          onClick={() => setScanInputMode("zip")}
+        >
+          Upload ZIP
+        </button>
+        <button
+          type="button"
+          className={scanInputMode === "github" ? "scan-mode-button active" : "scan-mode-button"}
+          onClick={() => setScanInputMode("github")}
+        >
+          GitHub URL
+        </button>
+      </div>
+
+      <form onSubmit={handleScanSubmit}>
+        {scanInputMode === "zip" ? (
+          <label className="upload-dropzone" htmlFor="repository-zip">
+            <span className="upload-icon" aria-hidden="true"><NavIcon name="upload" /></span>
+            <strong>{selectedFile ? selectedFile.name : "Choose a repository ZIP"}</strong>
+            <span>{selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB selected` : "Select a .zip file from your computer"}</span>
+            <input id="repository-zip" type="file" accept=".zip,application/zip" onChange={handleFileChange} disabled={uploading} />
+          </label>
+        ) : (
+          <label className="github-url-field" htmlFor="github-repository-url">
+            <span className="github-url-label">Public GitHub repository URL</span>
+            <input
+              id="github-repository-url"
+              type="url"
+              className="github-url-input"
+              placeholder="https://github.com/owner/repository"
+              value={githubUrl}
+              onChange={(event) => setGithubUrl(event.target.value)}
+              disabled={uploading}
+            />
+          </label>
+        )}
+
+        <div className="upload-actions">
+          <p>Only scan repositories you own or are authorized to assess.</p>
+          <button
+            className="primary-button"
+            type="submit"
+            disabled={
+              uploading ||
+              (scanInputMode === "zip" ? !selectedFile : !githubUrl.trim())
+            }
+          >
+            {uploading ? "Scanning repository…" : "Run security scan"}
+          </button>
+        </div>
+      </form>
+
+      {uploading && <div className="progress-message" role="status"><span className="loading-spinner" />Validating the repository and running available scanners…</div>}
+      {scanError && <div className="scan-error" role="alert"><strong>Scan issue</strong><p>{scanError}</p></div>}
     </section>
   </>;
 

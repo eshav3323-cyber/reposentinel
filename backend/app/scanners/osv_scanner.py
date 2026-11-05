@@ -199,13 +199,14 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(item.content, encoding="utf-8")
 
-        # OSV-Scanner v1.9.2 writes JSON to stdout.
-        # Do not use the v2-only "scan source" or "--output-file" arguments.
+        report_path = root / "osv-report.json"
         command = [
             executable,
             "--recursive",
             "--format",
             "json",
+            "--output-file",
+            str(report_path),
             str(root),
         ]
 
@@ -231,8 +232,11 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                     "OSV-Scanner could not be started."
                 ) from exc
 
-            # JSON is expected on stdout for OSV-Scanner v1.
-            report_text = completed.stdout or ""
+            report_text = ""
+            if report_path.exists():
+                report_text = report_path.read_text(encoding="utf-8")
+            if not report_text.strip():
+                report_text = completed.stdout or ""
 
             if not report_text.strip():
                 detail = (
@@ -240,7 +244,7 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                 ).strip()
 
                 raise OsvScanError(
-                    "OSV-Scanner did not produce JSON output. "
+                    "OSV-Scanner did not produce a JSON report. "
                     f"Exit code: {completed.returncode}. "
                     f"Output: {detail[-2000:] or 'No output received.'}"
                 )
