@@ -199,14 +199,11 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text(item.content, encoding="utf-8")
 
-        report_path = root / "osv-report.json"
         command = [
             executable,
             "--recursive",
             "--format",
             "json",
-            "--output-file",
-            str(report_path),
             str(root),
         ]
 
@@ -232,16 +229,10 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                     "OSV-Scanner could not be started."
                 ) from exc
 
-            report_text = ""
-            if report_path.exists():
-                report_text = report_path.read_text(encoding="utf-8")
-            if not report_text.strip():
-                report_text = completed.stdout or ""
+            report_text = completed.stdout or ""
 
             if not report_text.strip():
-                detail = (
-                    completed.stderr or completed.stdout or ""
-                ).strip()
+                detail = (completed.stderr or "").strip()
 
                 raise OsvScanError(
                     "OSV-Scanner did not produce a JSON report. "
@@ -258,9 +249,7 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
                 report = json.loads(report_text)
 
             except json.JSONDecodeError as exc:
-                detail = (
-                    completed.stderr or completed.stdout or ""
-                ).strip()
+                detail = (completed.stderr or "").strip()
 
                 raise OsvScanError(
                     "OSV-Scanner produced invalid JSON. "
