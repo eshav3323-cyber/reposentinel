@@ -142,7 +142,7 @@ class GitHubScanRequest(BaseModel):
     )
 
 
-def normalize_github_repository_url(raw_url: str) -> tuple[str, str]:
+def normalize_github_repository_url(raw_url: str) -> tuple[str, str, str | None]:
     candidate = (raw_url or "").strip()
     if not candidate:
         raise ValueError("GitHub repository URL is required.")
@@ -169,18 +169,32 @@ def normalize_github_repository_url(raw_url: str) -> tuple[str, str]:
     if not owner or not repo:
         raise ValueError("The GitHub URL does not contain both an owner and repository name.")
 
-    return owner, repo
+    branch_name: str | None = None
+    if len(parts) >= 4 and parts[2] in {"tree", "blob", "commit"}:
+        branch_name = "/".join(parts[3:])
+    elif len(parts) >= 3 and parts[2] in {"tree", "blob", "commit"}:
+        branch_name = parts[3] if len(parts) > 3 else None
+
+    return owner, repo, branch_name
 
 
-def fetch_public_github_archive(repository_url: str) -> tuple[str, bytes]:
-    owner, repo = normalize_github_repository_url(repository_url)
-    repo_id = f"{owner}/{repo}"
+def _gitHub_rate_limit_message(status_code: int | None = None, detail: str = "") -> str:
+    detail_text = detail.strip()
+    if status_code in {403, 429} or "rate limit" in detail_text.lower():
+        return (
+            "GitHub API rate limit reached while resolving the default branch for "
+            "this public repository. Please try again later or use a repository URL "
+            "that includes the branch name."
+        )
+    return "GitHub rate limit reached. Please try again later."
+
+
+def _github_default_branch(owner: str, repo: str) -> str:
     headers = {
         "User-Agent": "RepoSentinel-Health/1.0",
         "Accept": "application/vnd.github+json",
     }
-
-    api_url = f"https://api.github.com/repos/{repo_id}"
+    api_url = f"https://api.github.com/repos/{owner}/{repo}"
     api_request = Request(api_url, headers=headers)
 
     try:
@@ -188,29 +202,71 @@ def fetch_public_github_archive(repository_url: str) -> tuple[str, bytes]:
             payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         error_text = exc.read().decode("utf-8", errors="replace")
-        if exc.code == 403 or "rate limit" in error_text.lower():
-            raise ValueError("GitHub API rate limit reached. Please try again later.") from exc
+        if exc.code in {403, 429} or "rate limit" in error_text.lower():
+            raise ValueError(_gitHub_rate_limit_message(exc.code, error_text)) from exc
         raise ValueError(
             "The GitHub repository could not be accessed. Check the URL and ensure it is public."
         ) from exc
     except (URLError, TimeoutError, OSError) as exc:
         raise ValueError("Unable to reach GitHub to fetch the repository archive.") from exc
 
-    if isinstance(payload, dict):
-        if payload.get("private") is True:
-            raise ValueError("Only public GitHub repositories are supported.")
-
-        default_branch = payload.get("default_branch") or "main"
-    else:
+    if not isinstance(payload, dict):
         raise ValueError("GitHub repository metadata could not be read.")
 
-    archive_url = f"https://codeload.github.com/{repo_id}/zip/{default_branch}"
+    if payload.get("private") is True:
+        raise ValueError("Only public GitHub repositories are supported.")
+
+    default_branch = payload.get("default_branch")
+    if not default_branch:
+        raise ValueError("The GitHub repository has no default branch configured.")
+
+    return str(default_branch)
+
+
+def _codeload_archive_url(owner: str, repo: str, branch: str) -> str:
+    return (
+        f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/{branch.strip('/')}"
+    )
+
+
+def fetch_public_github_archive(repository_url: str) -> tuple[str, bytes]:
+    owner, repo, branch_hint = normalize_github_repository_url(repository_url)
+    repo_id = f"{owner}/{repo}"
+    headers = {
+        "User-Agent": "RepoSentinel-Health/1.0",
+        "Accept": "application/vnd.github+json",
+    }
+
+    branch_name = branch_hint
+    if not branch_name:
+        for candidate in ("main", "master"):
+            archive_url = _codeload_archive_url(owner, repo, candidate)
+            archive_request = Request(archive_url, headers=headers, method="HEAD")
+            try:
+                with urlopen(archive_request, timeout=20):
+                    branch_name = candidate
+                    break
+            except HTTPError as exc:
+                if exc.code not in {404, 410}:
+                    raise ValueError(
+                        "The public GitHub repository archive could not be downloaded."
+                    ) from exc
+            except (URLError, TimeoutError, OSError):
+                continue
+
+        if not branch_name:
+            branch_name = _github_default_branch(owner, repo)
+
+    archive_url = _codeload_archive_url(owner, repo, branch_name)
     archive_request = Request(archive_url, headers=headers)
 
     try:
         with urlopen(archive_request, timeout=30) as response:
             archive_bytes = response.read()
     except HTTPError as exc:
+        error_text = exc.read().decode("utf-8", errors="replace")
+        if exc.code in {403, 429} or "rate limit" in error_text.lower():
+            raise ValueError(_gitHub_rate_limit_message(exc.code, error_text)) from exc
         raise ValueError(
             "The public GitHub repository archive could not be downloaded."
         ) from exc
