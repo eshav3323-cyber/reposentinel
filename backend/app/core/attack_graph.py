@@ -87,7 +87,7 @@ def _classify_finding(finding: Any) -> tuple[str, str]:
 
     combined = f"{title} {rule_id} {description}"
 
-    if any(word in combined for word in (
+    if any(token in combined for token in (
         "secret", "credential", "password", "api key",
         "token", "private key", "gitleaks"
     )):
@@ -96,7 +96,7 @@ def _classify_finding(finding: Any) -> tuple[str, str]:
             "Potential credential exposure; validity and access are unverified.",
         )
 
-    if any(word in combined for word in (
+    if any(token in combined for token in (
         "dependency", "package", "vulnerability", "osv",
         "cve-", "pysec-", "ghsa-"
     )):
@@ -105,7 +105,7 @@ def _classify_finding(finding: Any) -> tuple[str, str]:
             "Dependency-related finding; exploitability is unverified.",
         )
 
-    if any(word in combined for word in (
+    if any(token in combined for token in (
         "patient", "medical record", "health record", "phi",
         "protected health", "personal data"
     )):
@@ -114,9 +114,15 @@ def _classify_finding(finding: Any) -> tuple[str, str]:
             "Potential health-data-related code; actual data access is unverified.",
         )
 
-    if any(word in combined for word in (
-        "sql", "injection", "eval(", "command execution",
-        "debug", "tls", "verify=false", "permission"
+    if any(token in combined for token in (
+        "debug mode explicitly enabled",
+        "tls certificate verification disabled",
+        "verify=false",
+        "cert_none",
+        "sql query string concatenation",
+        "dangerous-eval",
+        "dynamic code",
+        "permission",
     )):
         return (
             "application_code",

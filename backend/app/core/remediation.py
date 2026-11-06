@@ -85,7 +85,7 @@ def _classify(finding: Any) -> str:
     if any(token in primary for token in (
         "tls-verify-disabled", "tls verification", "certificate verification",
         "verify=false", "cert_none",
-    )):
+    )) or "tls certificate verification disabled" in title:
         return "tls"
     if any(token in primary for token in (
         "dangerous-eval", "dynamic code", "eval(", "exec(",

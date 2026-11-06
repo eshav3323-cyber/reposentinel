@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import tempfile
@@ -149,7 +150,17 @@ def _deduplication_key(
     )
 
 
-def scan_with_osv(source_files: list[SourceFile]) -> list:
+def _normalize_dependency_path(value: str | None) -> str:
+    """Strip temp roots and keep only the repository-relative file name."""
+    text = (value or "").replace("\\", "/").strip()
+    if not text or text in {"dependency manifest", "unknown"}:
+        return "dependency manifest"
+    if text.startswith("/") or re.match(r"^[A-Za-z]:/", text):
+        return Path(text).name or "dependency manifest"
+    return text.lstrip("./") or "dependency manifest"
+
+
+def scan_with_osv(source_files: list[SourceFile], include_test_fixtures: bool = False) -> list:
     """
     Scan dependency manifests and lockfiles with OSV-Scanner.
 
@@ -157,11 +168,14 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
     directory. Uploaded application code is never executed or installed.
     """
 
-    candidates = [
-        item
-        for item in source_files
-        if Path(item.path).name in DEPENDENCY_FILES
-    ]
+    candidates = []
+    for item in source_files:
+        normalized = item.path.replace("\\", "/").lower()
+        if Path(item.path).name not in DEPENDENCY_FILES:
+            continue
+        if not include_test_fixtures and ("/tests/" in normalized or "/fixtures/" in normalized or "/evaluation/" in normalized):
+            continue
+        candidates.append(item)
 
     if not candidates:
         return []
@@ -291,10 +305,12 @@ def scan_with_osv(source_files: list[SourceFile]) -> list:
 
                 source = result.get("source") or {}
 
-                source_path = _first_text(
-                    source.get("path") if isinstance(source, dict) else "",
-                    result.get("sourcePath"),
-                    "dependency manifest",
+                source_path = _normalize_dependency_path(
+                    _first_text(
+                        source.get("path") if isinstance(source, dict) else "",
+                        result.get("sourcePath"),
+                        "dependency manifest",
+                    )
                 )
 
                 packages = result.get("packages") or []

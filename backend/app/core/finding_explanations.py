@@ -127,7 +127,18 @@ def build_finding_explanation(finding: Finding | dict[str, Any]) -> FindingExpla
             ],
         )
 
-    if any(marker in combined_text for marker in ("debug", "tls", "ssl", "sql", "unsafe", "verify = false", "certificate verification", "sql injection", "insecure", "authentication", "authorization")):
+    if any(marker in combined_text for marker in (
+        "debug mode explicitly enabled",
+        "tls certificate verification disabled",
+        "verify=false",
+        "cert_none",
+        "sql query string concatenation",
+        "unsafe",
+        "sql injection",
+        "insecure",
+        "authentication",
+        "authorization",
+    )):
         return FindingExplanation(
             simple_title="The code contains a risky configuration or unsafe pattern",
             what_it_means=(

@@ -69,6 +69,63 @@ def test_detects_candidate_sql_concatenation():
     )
 
 
+def test_detects_real_requests_verify_false():
+    findings = scan_source_files([
+        make_source('requests.get(url, verify=False)')
+    ])
+
+    assert any(f.rule_id == "HEURISTIC-TLS-VERIFY-DISABLED" for f in findings)
+
+
+def test_detects_ssl_certificate_none_assignment():
+    findings = scan_source_files([
+        make_source('context.verify_mode = ssl.CERT_NONE')
+    ])
+
+    assert any(f.rule_id == "HEURISTIC-TLS-VERIFY-DISABLED" for f in findings)
+
+
+def test_ignores_tls_keywords_in_comments_and_docs():
+    findings = scan_source_files([
+        make_source("# verify=False is used in the example below\n# TLS certificate verification is disabled in docs\nprint('safe')")
+    ])
+
+    assert not any(f.rule_id == "HEURISTIC-TLS-VERIFY-DISABLED" for f in findings)
+
+    findings = scan_source_files([
+        make_source('"""TLS certificate verification is disabled in the docs example. verify=False. """\nprint("safe")')
+    ])
+
+    assert not any(f.rule_id == "HEURISTIC-TLS-VERIFY-DISABLED" for f in findings)
+
+
+def test_ignores_semgrep_rule_yaml_files():
+    findings = scan_source_files([
+        make_source('pattern: DEBUG = True\nmessage: "debug is enabled"', 'app/scanners/semgrep_rules.yml')
+    ])
+
+    assert findings == []
+
+
+def test_detects_real_debug_config_but_ignores_rule_definitions():
+    findings = scan_source_files([
+        make_source('DEBUG = True\n', 'app/settings.py')
+    ])
+    assert any(f.rule_id == 'HEURISTIC-DEBUG-ENABLED' for f in findings)
+
+    findings = scan_source_files([
+        make_source('pattern: DEBUG = True\nmessage: "Debug mode is explicitly enabled."', 'app/scanners/semgrep_rules.yml')
+    ])
+    assert findings == []
+
+
+def test_ignores_synthetic_test_credentials_in_fixture_paths():
+    findings = scan_source_files([
+        make_source('api_key = "DEMO_EXAMPLE_KEY_12345"', 'backend/tests/evaluation/fixtures/credential/vulnerable/config.py')
+    ])
+    assert not any(f.rule_id == "HEURISTIC-HARDCODED-CREDENTIAL" for f in findings)
+
+
 def test_finding_has_expected_schema():
     findings = scan_source_files([
         make_source("DEBUG = True", "config.py")
