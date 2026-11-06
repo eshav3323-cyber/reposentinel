@@ -5,8 +5,38 @@ import sqlite3
 from pathlib import Path
 from threading import RLock
 
+from app.core.finding_normalizer import build_finding_fingerprint
+from app.models.findings import Finding
+
 MAX_STORED_SCANS = 50
 _LOCK = RLock()
+
+
+def _deduplicate_saved_findings(findings):
+    unique: dict[str, Finding] = {}
+
+    for entry in findings:
+        candidate = entry.model_dump() if isinstance(entry, Finding) else dict(entry)
+        fingerprint = build_finding_fingerprint(candidate)
+        existing = unique.get(fingerprint)
+
+        if existing is None:
+            unique[fingerprint] = Finding(**candidate)
+            continue
+
+        if candidate.get("severity") in {"critical", "high", "medium", "low", "info"}:
+            severity_rank = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+            if severity_rank.get(candidate["severity"], -1) > severity_rank.get(existing.severity, -1):
+                existing.severity = candidate["severity"]
+
+        if candidate.get("source_scanner") and candidate["source_scanner"] not in str(existing.source_scanner):
+            existing.source_scanner = (
+                f"{existing.source_scanner}, {candidate['source_scanner']}"
+                if existing.source_scanner
+                else candidate["source_scanner"]
+            )
+
+    return [finding.model_dump() for finding in unique.values()]
 
 
 def _database_path() -> Path:
@@ -43,6 +73,13 @@ def initialize_scan_storage():
 
 def save_scan(result: dict):
     """Persist a scan and keep only the 50 most recent scans."""
+    findings = result.get("findings", [])
+    if findings:
+        result = {
+            **result,
+            "findings": _deduplicate_saved_findings(findings),
+        }
+
     serialized = json.dumps(result, ensure_ascii=False)
 
     with _LOCK, _connect() as connection:

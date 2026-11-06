@@ -6,6 +6,65 @@ from typing import Any
 from app.models.findings import Finding
 
 
+def _normalize_text(value: Any, *, fallback: str = "") -> str:
+    text = str(value if value is not None else fallback)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _normalize_path(path: Any) -> str:
+    value = str(path or "unknown").replace("\\", "/").strip()
+    value = re.sub(r"^\./+", "", value)
+    return value or "unknown"
+
+
+def _extract_package_details(value: Any) -> tuple[str, str]:
+    text = _normalize_text(value)
+    match = re.search(
+        r"Package:\s*([^\s]+)\s+Version:\s*([^\s.]+(?:\.[^\s]+)*)",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if not match:
+        return "", ""
+    return match.group(1), match.group(2)
+
+
+def build_finding_fingerprint(finding: dict[str, Any] | Finding) -> str:
+    """Create a stable identity for a finding that is safe for backend deduplication."""
+
+    if isinstance(finding, Finding):
+        candidate = finding.model_dump()
+    else:
+        candidate = dict(finding)
+
+    file_path = _normalize_path(candidate.get("file_path") or "unknown")
+    line_number = max(1, int(candidate.get("line_number") or 1))
+    title = _normalize_text(candidate.get("title") or "Unspecified security finding")
+    rule_id = _normalize_text(candidate.get("rule_id") or "UNSPECIFIED")
+    evidence = _normalize_text(candidate.get("redacted_evidence") or candidate.get("evidence") or "")
+    package_name, package_version = _extract_package_details(
+        candidate.get("description") or evidence
+    )
+
+    # Prefer the file location plus normalized issue family as the deterministic
+    # deduplication key. This keeps distinct findings apart while collapsing the
+    # same underlying issue when multiple scanners report it with slightly different
+    # rule identifiers or normalized labels.
+    key_parts = [
+        file_path,
+        str(line_number),
+        title,
+        package_name,
+        package_version,
+        evidence[:200],
+    ]
+    if title.lower() in {"unspecified security finding", ""}:
+        key_parts.append(rule_id)
+    identity = "|".join(part for part in key_parts if part)
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
 SECRET_VALUE_PATTERN = re.compile(
     r"""(?ix)
     (
@@ -94,11 +153,16 @@ def normalize_finding(
     confidence = confidence_aliases.get(confidence_input, "medium")
 
     # Stable identifiers avoid generating a new ID every time the same
-    # finding is encountered in an unchanged file.
-    identity = "|".join(
-        [source_scanner, rule_id, file_path, str(line_number), title]
-    )
-    finding_id = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:16]
+    # underlying issue is encountered in an unchanged file or dependency manifest.
+    identity = build_finding_fingerprint({
+        "title": title,
+        "rule_id": rule_id,
+        "file_path": file_path,
+        "line_number": line_number,
+        "redacted_evidence": evidence,
+        "description": description,
+    })
+    finding_id = identity[:16]
 
     return Finding(
         id=finding_id,

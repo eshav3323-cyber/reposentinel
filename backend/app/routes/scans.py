@@ -16,6 +16,7 @@ from app.core.archive_handler import (
     MAX_ARCHIVE_SIZE,
     read_repository_zip,
 )
+from app.core.finding_normalizer import build_finding_fingerprint
 from app.core.scan_storage import (
     initialize_scan_storage,
     save_scan,
@@ -93,12 +94,49 @@ def build_summary(findings: list, files_analyzed: int) -> dict:
 
 
 def deduplicate_findings(findings: list) -> list:
-    unique = {}
+    unique: dict[str, Finding] = {}
 
     for finding in findings:
-        finding_id = getattr(finding, "id", None) or str(uuid4())
-        if finding_id not in unique:
-            unique[finding_id] = finding
+        if isinstance(finding, dict):
+            fingerprint = build_finding_fingerprint(finding)
+            candidate = Finding(**finding)
+        else:
+            fingerprint = build_finding_fingerprint(finding)
+            candidate = finding
+
+        existing = unique.get(fingerprint)
+        if existing is None:
+            unique[fingerprint] = candidate
+            continue
+
+        if candidate.severity in {"critical", "high", "medium", "low", "info"}:
+            severity_rank = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+            if severity_rank.get(candidate.severity, -1) > severity_rank.get(existing.severity, -1):
+                existing.severity = candidate.severity
+
+        existing.confidence = max(
+            [existing.confidence, candidate.confidence],
+            key=lambda value: {"low": 1, "medium": 2, "high": 3}.get(value, 0),
+        )
+
+        if candidate.source_scanner and candidate.source_scanner not in str(existing.source_scanner):
+            existing.source_scanner = (
+                f"{existing.source_scanner}, {candidate.source_scanner}"
+                if existing.source_scanner
+                else candidate.source_scanner
+            )
+
+        if candidate.file_path and not existing.file_path:
+            existing.file_path = candidate.file_path
+        if candidate.line_number and not existing.line_number:
+            existing.line_number = candidate.line_number
+
+        if len(candidate.description) > len(existing.description):
+            existing.description = candidate.description
+        if len(candidate.remediation) > len(existing.remediation):
+            existing.remediation = candidate.remediation
+        if not existing.redacted_evidence and candidate.redacted_evidence:
+            existing.redacted_evidence = candidate.redacted_evidence
 
     return list(unique.values())
 
