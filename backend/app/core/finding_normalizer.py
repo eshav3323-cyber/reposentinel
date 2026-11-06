@@ -3,6 +3,7 @@ import hashlib
 import re
 from typing import Any
 
+from app.core.finding_explanations import build_finding_explanation
 from app.models.findings import Finding
 
 
@@ -164,7 +165,7 @@ def normalize_finding(
     })
     finding_id = identity[:16]
 
-    return Finding(
+    finding = Finding(
         id=finding_id,
         title=title,
         rule_id=rule_id,
@@ -178,3 +179,5 @@ def normalize_finding(
         confidence=confidence,
         detection_type=detection_type,
     )
+    finding.explanation = build_finding_explanation(finding)
+    return finding

@@ -1394,6 +1394,48 @@ a {
   overflow-wrap: anywhere;
 }
 
+.finding-simple-title {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.explanation-stack {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.explanation-section {
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.explanation-section h4 {
+  margin: 0 0 7px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.explanation-section p,
+.explanation-section li {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.explanation-section ul,
+.explanation-section ol {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
 .finding-location {
   display: flex;
   flex-wrap: wrap;
@@ -1450,6 +1492,66 @@ a {
   font-size: 11px;
   line-height: 1.8;
   overflow-wrap: anywhere;
+}
+
+.technical-details {
+  margin-top: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.technical-details summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.technical-content {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.technical-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.technical-grid > div,
+.technical-block {
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-alt);
+}
+
+.technical-grid span,
+.technical-block span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.technical-grid strong,
+.technical-block p,
+.technical-block pre {
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.technical-block pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
 .finding-disclaimer {

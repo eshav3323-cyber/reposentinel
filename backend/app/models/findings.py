@@ -9,6 +9,14 @@ DetectionType = Literal["scanner", "heuristic", "modeled_assumption"]
 Confidence = Literal["high", "medium", "low"]
 
 
+class FindingExplanation(BaseModel):
+    simple_title: str
+    what_it_means: str
+    why_it_matters: str
+    possible_impact: list[str]
+    how_to_fix: list[str]
+
+
 class Finding(BaseModel):
     id: str
     title: str
@@ -22,3 +30,4 @@ class Finding(BaseModel):
     source_scanner: str
     confidence: Confidence
     detection_type: DetectionType
+    explanation: FindingExplanation | None = None
