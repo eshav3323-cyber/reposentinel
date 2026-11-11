@@ -19,6 +19,10 @@
   const API_BASE_URL = resolveApiBaseUrl();
   const DEFAULT_TIMEOUT_MS = 8000;
 
+  export function getApiDocsUrl() {
+    return `${API_BASE_URL}/docs`;
+  }
+
   async function request(endpoint, options = {}, timeoutMs = DEFAULT_TIMEOUT_MS) {
     const controller = new AbortController();
     const timeout = window.setTimeout(() => controller.abort(), timeoutMs);

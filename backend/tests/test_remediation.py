@@ -140,7 +140,8 @@ def test_unrelated_finding_does_not_claim_path_coverage():
     graph_path = [{"id": "p-1", "node_ids": ["finding-similar-title"]}]
     result = plan(items, graph_path)
     assert result.ranked_recommendations[0].covered_path_ids == []
-    assert result.selected_recommendations == []
+    assert len(result.selected_recommendations) == 1
+    assert "high- or critical" in result.selected_recommendations[0].selection_reason
     assert result.path_coverage_after.unaddressed_paths == 1
 
 
@@ -189,6 +190,61 @@ def test_greedy_selection_maximizes_distinct_path_coverage_within_budget():
     assert len(result.selected_recommendations) == 2
     assert result.path_coverage_after.covered_path_ids == ["p-1", "p-2", "p-3"]
     assert result.selected_recommendations[0].related_finding_ids == ["a"]
+    assert "newly candidate-covered" in result.selected_recommendations[0].selection_reason
+
+
+def test_off_path_high_candidate_is_selected_after_group_coverage():
+    items = [
+        finding(finding_id="path-finding", severity="medium"),
+        finding(finding_id="off-path-critical", severity="critical"),
+    ]
+    paths = [{"id": "p-1", "node_ids": ["finding-path-finding"]}]
+
+    result = plan(items, paths, budget=2)
+
+    assert [
+        recommendation.related_finding_ids[0]
+        for recommendation in result.selected_recommendations
+    ] == ["path-finding", "off-path-critical"]
+    assert "budget remained" in result.selected_recommendations[1].selection_reason
+
+
+def test_off_path_medium_candidate_is_not_selected_when_groups_exist():
+    result = plan(
+        [finding(finding_id="off-path-medium", severity="medium")],
+        [{"id": "p-1", "node_ids": ["finding-other"]}],
+    )
+
+    assert result.selected_recommendations == []
+    assert result.ranked_recommendations[0].selection_reason is None
+
+
+def test_unknown_severity_and_confidence_use_safe_priority_defaults():
+    result = plan([
+        finding(
+            finding_id="unknown-priority",
+            severity="unrecognized",
+            confidence="unrecognized",
+        )
+    ])
+    recommendation = result.selected_recommendations[0]
+
+    assert recommendation.severity == "info"
+    assert recommendation.confidence == "low"
+    assert recommendation.risk_reduction_score == 15
+    assert "not a CVSS/EPSS score" in recommendation.score_explanation
+
+
+def test_budget_is_clamped_to_supported_maximum():
+    items = [
+        finding(finding_id=f"budget-{index}", severity="low")
+        for index in range(30)
+    ]
+
+    result = plan(items, budget=99)
+
+    assert result.budget == 25
+    assert len(result.selected_recommendations) == 25
 
 
 def test_empty_findings_and_paths_are_valid():
@@ -200,7 +256,7 @@ def test_empty_findings_and_paths_are_valid():
 
 
 def test_recommendation_for_finding_without_path_is_ranked_when_paths_exist():
-    items = [finding(finding_id="off-path", severity="critical")]
+    items = [finding(finding_id="off-path", severity="medium")]
     result = plan(items, [{"id": "p-1", "node_ids": ["finding-other"]}])
     assert result.selected_recommendations == []
     assert result.ranked_recommendations[0].related_finding_ids == ["off-path"]

@@ -152,6 +152,15 @@ def test_scan_repository_from_github_uses_downloaded_archive(monkeypatch):
 
     monkeypatch.setattr(scan_routes, "fetch_public_github_archive", fake_fetch_public_github_archive)
     monkeypatch.setattr(scan_routes, "read_repository_zip", fake_read_repository_zip)
+    for scanner_name in (
+        "scan_with_reposentinel_core",
+        "scan_source_files",
+        "scan_with_gitleaks",
+        "scan_with_semgrep",
+        "scan_with_osv",
+    ):
+        monkeypatch.setattr(scan_routes, scanner_name, lambda _files: [])
+    monkeypatch.setattr(scan_routes, "save_scan", lambda _result: None)
 
     response = client.post(
         "/api/scans/github",
@@ -162,5 +171,12 @@ def test_scan_repository_from_github_uses_downloaded_archive(monkeypatch):
     payload = response.json()
     assert captured["repository_url"] == "https://github.com/example/demo"
     assert payload["filename"] == "example/demo"
-    assert payload["status"] in {"completed", "partial"}
+    assert payload["status"] == "completed"
     assert payload["summary"]["files_analyzed"] >= 1
+    assert set(payload["scanner_status"]) == {
+        "reposentinel_core",
+        "heuristic",
+        "gitleaks",
+        "semgrep",
+        "osv",
+    }

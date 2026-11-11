@@ -42,6 +42,7 @@ def test_deduplicate_findings_collapses_same_issue_across_scanners():
     assert len(deduped) == 1
     assert deduped[0].file_path == "src/config.py"
     assert deduped[0].line_number == 12
+    assert deduped[0].source_scanner == "RepoSentinel Heuristic, Gitleaks"
 
 
 def test_deduplicate_findings_keeps_distinct_issues_in_same_file():
@@ -89,3 +90,29 @@ def test_storage_deduplication_reduces_repeated_findings_before_persistence():
 
     assert len(deduped) == 1
     assert deduped[0]["rule_id"] == "SQL-001"
+
+
+def test_storage_deduplication_preserves_cross_scanner_attribution_and_content():
+    first = _make_finding(
+        title="Potential SQL injection",
+        rule_id="SQL-001",
+        file_path="app/db.py",
+        line_number=18,
+        source_scanner="Semgrep",
+    )
+    second = _make_finding(
+        title="Potential SQL injection",
+        rule_id="SQL-002",
+        file_path="app/db.py",
+        line_number=18,
+        source_scanner="RepoSentinel Core",
+    )
+
+    deduped = _deduplicate_saved_findings(
+        [first.model_dump(), second.model_dump()]
+    )
+
+    assert len(deduped) == 1
+    assert deduped[0]["source_scanner"] == "Semgrep, RepoSentinel Core"
+    assert deduped[0]["description"] == "Security issue requires review."
+    assert deduped[0]["remediation"] == "Fix the issue before deployment."

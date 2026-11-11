@@ -205,9 +205,63 @@ def build_attack_graph(
                 evidence_type="modeled",
             ))
 
-    for index, finding in enumerate(findings, start=1):
+    unique_findings: dict[str, Any] = {}
+    duplicate_finding_ids = False
+    for finding in findings:
         title = redact_evidence(_safe_text(
-            _get_value(finding, "title"), f"Finding {index}"
+            _get_value(finding, "title"), "Untitled finding"
+        ))
+        file_path = _normalize_path(
+            _get_value(finding, "file_path", "unknown")
+        )
+        source_scanner = _safe_text(
+            _get_value(finding, "source_scanner"), "unknown"
+        )
+        finding_id = _safe_text(_get_value(finding, "id")).strip()
+        if not finding_id:
+            finding_id = _make_id(
+                "finding",
+                f"{scan_id}|{source_scanner}|{file_path}|{title}",
+            )
+
+        existing = unique_findings.get(finding_id)
+        if existing is not None:
+            duplicate_finding_ids = True
+            existing_description = _safe_text(
+                _get_value(existing, "description")
+            )
+            description = _safe_text(_get_value(finding, "description"))
+            existing_key = (
+                SEVERITY_ORDER[_normalize_severity(
+                    _get_value(existing, "severity", "unknown")
+                )],
+                len(existing_description),
+                _normalize_path(_get_value(existing, "file_path", "unknown")),
+                _safe_text(_get_value(existing, "title")),
+                existing_description,
+            )
+            finding_key = (
+                SEVERITY_ORDER[_normalize_severity(
+                    _get_value(finding, "severity", "unknown")
+                )],
+                len(description),
+                file_path,
+                title,
+                description,
+            )
+            if finding_key > existing_key:
+                unique_findings[finding_id] = finding
+            continue
+        unique_findings[finding_id] = finding
+
+    if duplicate_finding_ids:
+        warnings.append(
+            "Duplicate finding IDs were collapsed before graph generation."
+        )
+
+    for finding_id, finding in sorted(unique_findings.items()):
+        title = redact_evidence(_safe_text(
+            _get_value(finding, "title"), "Untitled finding"
         ))
         file_path = _normalize_path(
             _get_value(finding, "file_path", "unknown")
@@ -222,14 +276,6 @@ def build_attack_graph(
             _get_value(finding, "description"),
             "Finding requires manual review.",
         ))
-
-        finding_id = _safe_text(_get_value(finding, "id"))
-
-        if not finding_id:
-            finding_id = _make_id(
-                "finding",
-                f"{scan_id}|{source_scanner}|{file_path}|{title}|{index}",
-            )
 
         graph_finding_id = f"finding-{finding_id}"
 
@@ -312,7 +358,8 @@ def build_attack_graph(
 
     # Build conservative modeled paths only when a file has multiple
     # relevant findings. A path is a hypothesis for review, not proof.
-    for file_path, file_findings in findings_by_file.items():
+    grouped_finding_ids: set[str] = set()
+    for file_path, file_findings in sorted(findings_by_file.items()):
         if len(file_findings) < 2:
             continue
 
@@ -331,14 +378,16 @@ def build_attack_graph(
 
         ordered = sorted(
             file_findings,
-            key=lambda entry: SEVERITY_ORDER[
-                _normalize_severity(_get_value(entry[1], "severity"))
-            ],
-            reverse=True,
+            key=lambda entry: (
+                -SEVERITY_ORDER[_normalize_severity(
+                    _get_value(entry[1], "severity")
+                )],
+                entry[0],
+            ),
         )
 
         selected = ordered[:4]
-        path_node_ids = [entry[0] for entry in selected]
+        path_node_ids = list(dict.fromkeys(entry[0] for entry in selected))
 
         if len(path_node_ids) < 2:
             continue
@@ -360,40 +409,46 @@ def build_attack_graph(
         attack_paths.append(
             AttackPath(
                 id=path_id,
-                title="Modeled multi-finding review path",
+                title="Modeled multi-finding review group",
                 node_ids=path_node_ids,
                 risk_level=highest_severity,
                 explanation=(
-                    f"Multiple findings in {file_path} may warrant joint review. "
-                    "The graph does not establish reachability, exploitation, "
-                    "or access to patient data."
+                    f"Multiple findings in {file_path} are grouped for joint review. "
+                    "No directed relationship between these findings is established; "
+                    "the group does not prove reachability, exploitation, or access to patient data."
                 ),
                 evidence_type="modeled",
             )
         )
+        grouped_finding_ids.update(path_node_ids)
 
-    if not attack_paths and findings:
-        # A single finding can be shown as a review hypothesis linked to its
-        # modeled asset; this is not a claim of reachability or exploitation.
-        for file_path, file_findings in findings_by_file.items():
-            for graph_finding_id, finding, _category in file_findings:
-                severity = _normalize_severity(_get_value(finding, "severity"))
-                attack_paths.append(AttackPath(
-                    id=_make_id("path", f"{scan_id}|review|{file_path}|{graph_finding_id}"),
-                    title="Modeled single-finding review hypothesis",
-                    node_ids=[graph_finding_id],
-                    risk_level=severity,
-                    explanation=(
-                        f"Review the finding associated with {file_path}. This modeled hypothesis "
-                        "does not establish reachability, exploitation, or access to data."
-                    ),
-                    evidence_type="modeled",
-                ))
+    # Keep every finding visible to remediation/path review, including items
+    # omitted from a four-finding group or findings in otherwise unrelated files.
+    for file_path, file_findings in sorted(findings_by_file.items()):
+        for graph_finding_id, finding, _category in sorted(
+            file_findings, key=lambda entry: entry[0]
+        ):
+            if graph_finding_id in grouped_finding_ids:
+                continue
+            severity = _normalize_severity(_get_value(finding, "severity"))
+            attack_paths.append(AttackPath(
+                id=_make_id(
+                    "path", f"{scan_id}|review|{file_path}|{graph_finding_id}"
+                ),
+                title="Modeled single-finding review hypothesis",
+                node_ids=[graph_finding_id],
+                risk_level=severity,
+                explanation=(
+                    f"Review the finding associated with {file_path}. This modeled hypothesis "
+                    "does not establish reachability, exploitation, or access to data."
+                ),
+                evidence_type="modeled",
+            ))
 
-    if not attack_paths:
+    if findings and not grouped_finding_ids:
         warnings.append(
-            "No multi-finding review paths met the current modeling rules. "
-            "This does not prove the repository is safe."
+            "No multi-finding review groups met the current modeling rules. "
+            "Individual findings remain available for review; this does not prove the repository is safe."
         )
 
     warnings.append(

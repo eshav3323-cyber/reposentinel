@@ -260,9 +260,10 @@ def _candidate(finding: Any, graph: Any) -> RemediationRecommendation:
     path_bonus = min(len(covered), 3) * 5
     score = min(100, severity_weight * 15 + confidence_weight * 5 + path_bonus)
     score_explanation = (
-        f"Heuristic score = severity weight ({severity_weight} x 15) + "
+        f"Priority heuristic = severity weight ({severity_weight} x 15) + "
         f"confidence weight ({confidence_weight} × 5) + modeled path association "
-        f"({path_bonus}); capped at 100. It is a prioritization estimate, not a measured risk reduction."
+        f"({path_bonus}); capped at 100. It is not a CVSS/EPSS score, exploitability "
+        "probability, or measured risk reduction."
     )
     evidence_classification = (
         "modeled_assumption"
@@ -311,9 +312,9 @@ def _coverage(paths: list[Any], covered_ids: set[str]) -> PathCoverage:
         covered_path_ids=covered,
         unaddressed_path_ids=unaddressed,
         interpretation=(
-            "A path is counted as candidate-covered when a selected recommendation "
-            "targets a finding explicitly represented on that modeled path. This "
-            "does not mean the path is eliminated."
+            "A modeled review group is counted as candidate-covered when a selected "
+            "recommendation targets a finding explicitly represented in that group. "
+            "This does not mean the group is resolved or eliminated."
         ),
     )
 
@@ -339,6 +340,7 @@ def build_remediation_plan(
     ]
     remaining = list(candidates)
     selected: list[RemediationRecommendation] = []
+    selection_reasons: dict[str, str] = {}
     covered_so_far: set[str] = set()
 
     while remaining and len(selected) < budget:
@@ -351,11 +353,44 @@ def build_remediation_plan(
                 recommendation.id,
             )
 
-        choice = min(remaining, key=greedy_key)
-        if paths and not (
-            set(choice.covered_path_ids) - covered_so_far
-        ):
-            break
+        coverage_candidates = [
+            recommendation for recommendation in remaining
+            if set(recommendation.covered_path_ids) - covered_so_far
+        ]
+        if coverage_candidates:
+            choice = min(coverage_candidates, key=greedy_key)
+            new_path_count = len(
+                set(choice.covered_path_ids) - covered_so_far
+            )
+            selection_reasons[choice.id] = (
+                f"Selected because it adds {new_path_count} newly candidate-covered "
+                "modeled review group(s). Candidate coverage does not mean a group is resolved."
+            )
+        elif paths:
+            worthwhile_candidates = [
+                recommendation for recommendation in remaining
+                if recommendation.severity in {"critical", "high"}
+            ]
+            if not worthwhile_candidates:
+                break
+            choice = min(
+                worthwhile_candidates,
+                key=lambda recommendation: (
+                    -severity_by_id[recommendation.id],
+                    -recommendation.risk_reduction_score,
+                    recommendation.id,
+                ),
+            )
+            selection_reasons[choice.id] = (
+                "Selected after modeled review-group coverage because this is a "
+                "high- or critical-severity finding and budget remained."
+            )
+        else:
+            choice = min(remaining, key=greedy_key)
+            selection_reasons[choice.id] = (
+                "Selected by severity, priority heuristic, and stable recommendation "
+                "ID because no valid modeled review groups were available."
+            )
         selected.append(choice)
         covered_so_far.update(choice.covered_path_ids)
         remaining.remove(choice)
@@ -372,7 +407,13 @@ def build_remediation_plan(
         ),
     )
     ranked = selected + unselected
-    ranked = [rec.model_copy(update={"rank": rank}) for rank, rec in enumerate(ranked, 1)]
+    ranked = [
+        rec.model_copy(update={
+            "rank": rank,
+            "selection_reason": selection_reasons.get(rec.id),
+        })
+        for rank, rec in enumerate(ranked, 1)
+    ]
     selected_ids = {rec.id for rec in selected}
     selected_ranked = [rec for rec in ranked if rec.id in selected_ids]
     after = _coverage(paths, covered_so_far)
@@ -382,12 +423,14 @@ def build_remediation_plan(
         summary = (
             f"Selected {len(selected_ranked)} candidate remediation(s) within a "
             f"budget of {budget}; {after.candidate_covered_paths} of "
-            f"{after.modeled_paths} modeled paths contain at least one targeted finding."
+            f"{after.modeled_paths} modeled review groups contain at least one targeted finding."
         )
         optimization = (
-            "Greedy selection maximizes newly covered modeled paths at each step; "
-            "ties break by severity, heuristic score, then stable recommendation ID. "
-            "Path coverage means a path contains a targeted finding, not that it is eliminated."
+            "Selection first maximizes newly candidate-covered modeled review groups; "
+            "ties break by severity, priority heuristic, then stable recommendation ID. "
+            "After no new group coverage is available, high- and critical-severity findings "
+            "remain eligible while budget remains. Candidate coverage does not mean a group "
+            "is resolved or eliminated."
         )
     else:
         summary = (
@@ -395,8 +438,8 @@ def build_remediation_plan(
             f"budget of {budget}. No valid modeled paths were available, so path coverage was not calculated."
         )
         optimization = (
-            "Without modeled paths, selection is ordered by severity, heuristic "
-            "score, then stable recommendation ID; no path coverage claim is made."
+            "Without valid modeled review groups, selection is ordered by severity, "
+            "priority heuristic, then stable recommendation ID; no path coverage claim is made."
         )
 
     limitations = [
