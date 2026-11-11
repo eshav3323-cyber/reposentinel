@@ -12,6 +12,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./AttackGraph.css";
+import { getPathGraphSelection } from "./pathSelection.js";
 
 const NODE_COLORS = {
   entry_point: "var(--node-neutral)",
@@ -229,6 +230,15 @@ function getEdgeColor(edge) {
     : "var(--edge-modeled)";
 }
 
+function getPathReviewLabel(path, selection) {
+  if (selection?.relationType === "relationship_chain") {
+    return "Modeled relationship chain";
+  }
+  return path?.node_ids?.length === 1
+    ? "Single-finding review"
+    : "Related-findings review group";
+}
+
 export default function AttackGraph({
   graph,
   findings = [],
@@ -320,6 +330,15 @@ export default function AttackGraph({
     (path) => path.id === selectedPathId
   );
 
+  const knownNodeIds = useMemo(
+    () => new Set(nodes.map((node) => node.id)),
+    [nodes]
+  );
+  const selectedPathSelection = useMemo(
+    () => getPathGraphSelection(selectedPath, edges, knownNodeIds),
+    [selectedPath, edges, knownNodeIds]
+  );
+
   const selectedNode = useMemo(
     () => nodes.find((node) => node.id === selectedNodeId) || null,
     [nodes, selectedNodeId]
@@ -346,14 +365,6 @@ export default function AttackGraph({
       .filter(Boolean);
   }, [findings, selectedPath]);
 
-  const selectedNodeIds = useMemo(
-    () =>
-      new Set(
-        selectedPath?.node_ids || []
-      ),
-    [selectedPath]
-  );
-
   const displayedNodes = useMemo(() => {
     if (!selectedPath || selectedPathId === "all") {
       return nodes.map((node) => ({
@@ -366,26 +377,30 @@ export default function AttackGraph({
       ...node,
       style: {
         ...node.style,
-        opacity: selectedNodeIds.has(node.id) ? 1 : 0.2,
-        border: node.id === selectedNodeId ? "2px solid var(--emerald)" : node.style?.border,
+        opacity: selectedPathSelection.visibleNodeIds.has(node.id) ? 1 : 0.2,
+        border: node.id === selectedNodeId
+          ? "2px solid var(--emerald)"
+          : selectedPathSelection.memberNodeIds.has(node.id)
+            ? "2px solid var(--emerald)"
+            : node.style?.border,
       },
     }));
-  }, [nodes, selectedPath, selectedPathId, selectedNodeIds, selectedNodeId]);
+  }, [nodes, selectedPath, selectedPathId, selectedPathSelection, selectedNodeId]);
 
   const displayedEdges = useMemo(() => {
     if (!selectedPath || selectedPathId === "all") {
       return edges;
     }
 
-    const pathNodes = selectedPath.node_ids;
-
     return edges.map((edge) => {
-      const belongsToPath =
-        pathNodes.includes(edge.source) &&
-        pathNodes.includes(edge.target);
+      const belongsToPath = selectedPathSelection.highlightedEdgeIds.has(edge.id);
 
       return {
         ...edge,
+        markerEnd: {
+          ...edge.markerEnd,
+          color: belongsToPath ? "var(--emerald)" : edge.markerEnd?.color,
+        },
         style: {
           ...edge.style,
           opacity: belongsToPath ? 1 : 0.08,
@@ -395,7 +410,7 @@ export default function AttackGraph({
         animated: belongsToPath && edge.animated,
       };
     });
-  }, [edges, selectedPath, selectedPathId]);
+  }, [edges, selectedPath, selectedPathId, selectedPathSelection]);
 
   async function copyText(value) {
     try {
@@ -421,6 +436,7 @@ export default function AttackGraph({
 
   async function handleCopyPath(path) {
     if (!path) return;
+    const selection = getPathGraphSelection(path, edges, knownNodeIds);
     const fixes = findings
       .map((finding) => {
         const id = String(finding.id ?? "");
@@ -434,8 +450,8 @@ export default function AttackGraph({
       .filter(Boolean);
 
     const text = [
-      `Path: ${path.title}`,
-      `Risk: ${formatLabel(path.risk_level)}`,
+      `${getPathReviewLabel(path, selection)}: ${path.title}`,
+      `Severity: ${formatLabel(path.risk_level)}`,
       `Explanation: ${path.explanation || "No explanation provided."}`,
       `Fix method: ${fixes.length ? fixes.join("\n- ") : "No explicit remediation guidance was provided for this path."}`,
       `Node IDs: ${(path.node_ids || []).join(", ")}`,
@@ -520,11 +536,11 @@ export default function AttackGraph({
         <div className="graph-toolbar-counts">
           <span><strong>{nodes.length}</strong> nodes</span>
           <span><strong>{edges.length}</strong> relationships</span>
-          <span><strong>{paths.length}</strong> modeled paths</span>
+          <span><strong>{paths.length}</strong> modeled review groups</span>
         </div>
 
         <label className="graph-path-filter">
-          <span>Explore path</span>
+          <span>Explore review group</span>
           <select
             value={selectedPathId}
             onChange={(event) => {
@@ -543,10 +559,11 @@ export default function AttackGraph({
       </div>
 
       {paths.length > 0 && (
-        <div className="graph-path-list" aria-label="Modeled attack paths">
+        <div className="graph-path-list" aria-label="Modeled review groups">
           {paths.map((path) => {
             const isSelected = path.id === selectedPathId;
             const isCopied = copiedPathId === path.id;
+            const selection = getPathGraphSelection(path, edges, knownNodeIds);
             return (
               <button
                 key={path.id}
@@ -555,7 +572,9 @@ export default function AttackGraph({
                 onClick={() => setSelectedPathId(path.id)}
               >
                 <span className="graph-path-item-title">{path.title}</span>
-                <span className="graph-path-item-meta">{formatLabel(path.risk_level)} risk</span>
+                <span className="graph-path-item-meta">
+                  {getPathReviewLabel(path, selection)} · {formatLabel(path.risk_level)} severity
+                </span>
                 <span
                   className="graph-path-copy-inline"
                   onClick={(event) => {
@@ -564,7 +583,7 @@ export default function AttackGraph({
                   }}
                   role="button"
                   tabIndex={0}
-                  aria-label={`Copy path ${path.title}`}
+                  aria-label={`Copy review group ${path.title}`}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
@@ -630,7 +649,7 @@ export default function AttackGraph({
           <div className="attack-path-details-heading">
             <div>
               <p className="attack-path-eyebrow">
-                SELECTED MODELED PATH
+                {getPathReviewLabel(selectedPath, selectedPathSelection).toUpperCase()}
               </p>
               <h3>{selectedPath.title}</h3>
             </div>
@@ -654,12 +673,16 @@ export default function AttackGraph({
 
           <div className="attack-path-actions">
             <button type="button" className="path-copy-button" onClick={handleCopySelectedPath}>
-              {copiedPathId === selectedPath.id ? "Copied" : "Copy selected path"}
+              {copiedPathId === selectedPath.id ? "Copied" : "Copy selected review group"}
             </button>
           </div>
 
           <p className="path-caveat">
-            This is a modeled hypothesis, not a confirmed exploit chain.
+            {selectedPathSelection.relationType === "relationship_chain"
+              ? "A modeled relationship chain is not proof of exploitability or causal flow; validate every link."
+              : selectedPath.node_ids?.length === 1
+                ? "This is a single-finding review hypothesis, not a confirmed exploit chain."
+                : "These findings are grouped for review; no directed finding-to-finding chain is represented."}
           </p>
         </section>
       )}

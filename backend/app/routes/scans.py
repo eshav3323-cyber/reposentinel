@@ -16,7 +16,11 @@ from app.core.archive_handler import (
     MAX_ARCHIVE_SIZE,
     read_repository_zip,
 )
-from app.core.finding_normalizer import build_finding_fingerprint
+from app.core.finding_normalizer import (
+    build_finding_fingerprint,
+    merge_findings,
+    scanner_attributions,
+)
 from app.core.scan_storage import (
     initialize_scan_storage,
     save_scan,
@@ -25,17 +29,11 @@ from app.core.scan_storage import (
     MAX_STORED_SCANS,
 )
 from app.scanners.heuristic import scan_source_files
-from app.scanners.gitleaks import (
-    GitleaksScanError,
-    scan_with_gitleaks,
-)
-from app.scanners.semgrep_scanner import (
-    SemgrepScanError,
-    scan_with_semgrep,
-)
-from app.scanners.osv_scanner import (
-    OsvScanError,
-    scan_with_osv,
+from app.scanners.gitleaks import scan_with_gitleaks
+from app.scanners.semgrep_scanner import scan_with_semgrep
+from app.scanners.osv_scanner import scan_with_osv
+from app.scanners.reposentinel_core.integration import (
+    scan_with_reposentinel_core,
 )
 from app.models.findings import Finding
 
@@ -109,40 +107,14 @@ def deduplicate_findings(findings: list) -> list:
             unique[fingerprint] = candidate
             continue
 
-        if candidate.severity in {"critical", "high", "medium", "low", "info"}:
-            severity_rank = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
-            if severity_rank.get(candidate.severity, -1) > severity_rank.get(existing.severity, -1):
-                existing.severity = candidate.severity
-
-        existing.confidence = max(
-            [existing.confidence, candidate.confidence],
-            key=lambda value: {"low": 1, "medium": 2, "high": 3}.get(value, 0),
-        )
-
-        if candidate.source_scanner and candidate.source_scanner not in str(existing.source_scanner):
-            existing.source_scanner = (
-                f"{existing.source_scanner}, {candidate.source_scanner}"
-                if existing.source_scanner
-                else candidate.source_scanner
-            )
-
-        if candidate.file_path and not existing.file_path:
-            existing.file_path = candidate.file_path
-        if candidate.line_number and not existing.line_number:
-            existing.line_number = candidate.line_number
-
-        if len(candidate.description) > len(existing.description):
-            existing.description = candidate.description
-        if len(candidate.remediation) > len(existing.remediation):
-            existing.remediation = candidate.remediation
-        if not existing.redacted_evidence and candidate.redacted_evidence:
-            existing.redacted_evidence = candidate.redacted_evidence
+        merge_findings(existing, candidate)
 
     return list(unique.values())
 
 
 def count_unique_by_scanner(findings: list) -> dict[str, int]:
     counts = {
+        "reposentinel_core": 0,
         "heuristic": 0,
         "gitleaks": 0,
         "semgrep": 0,
@@ -150,6 +122,8 @@ def count_unique_by_scanner(findings: list) -> dict[str, int]:
     }
 
     aliases = {
+        "reposentinel core": "reposentinel_core",
+        "reposentinel_core": "reposentinel_core",
         "heuristic": "heuristic",
         "reposentinel heuristic": "heuristic",
         "gitleaks": "gitleaks",
@@ -163,10 +137,14 @@ def count_unique_by_scanner(findings: list) -> dict[str, int]:
             finding.get("source_scanner", "")
             if isinstance(finding, dict)
             else getattr(finding, "source_scanner", "")
-        ).strip().lower()
+        )
 
-        scanner_name = aliases.get(source)
-        if scanner_name:
+        scanners_for_finding = {
+            aliases[name.casefold()]
+            for name in scanner_attributions(source)
+            if name.casefold() in aliases
+        }
+        for scanner_name in scanners_for_finding:
             counts[scanner_name] += 1
 
     return counts
@@ -300,7 +278,39 @@ def fetch_public_github_archive(repository_url: str) -> tuple[str, bytes]:
 
     try:
         with urlopen(archive_request, timeout=30) as response:
-            archive_bytes = response.read()
+            response_headers = getattr(response, "headers", None)
+            content_length = (
+                response_headers.get("Content-Length")
+                if response_headers is not None
+                else None
+            )
+            try:
+                declared_size = int(content_length) if content_length is not None else None
+            except (TypeError, ValueError):
+                declared_size = None
+
+            if declared_size is not None and declared_size > MAX_ARCHIVE_SIZE:
+                raise ValueError(
+                    f"The downloaded GitHub archive exceeds the "
+                    f"{MAX_ARCHIVE_SIZE // (1024 * 1024)} MB limit."
+                )
+
+            chunks = bytearray()
+            while len(chunks) <= MAX_ARCHIVE_SIZE:
+                chunk = response.read(
+                    min(64 * 1024, MAX_ARCHIVE_SIZE + 1 - len(chunks))
+                )
+                if not chunk:
+                    break
+                chunks.extend(chunk)
+            if len(chunks) > MAX_ARCHIVE_SIZE:
+                raise ValueError(
+                    f"The downloaded GitHub archive exceeds the "
+                    f"{MAX_ARCHIVE_SIZE // (1024 * 1024)} MB limit."
+                )
+            archive_bytes = bytes(chunks)
+    except ValueError:
+        raise
     except HTTPError as exc:
         error_text = exc.read().decode("utf-8", errors="replace")
         if exc.code in {403, 429} or "rate limit" in error_text.lower():
@@ -322,13 +332,14 @@ def fetch_public_github_archive(repository_url: str) -> tuple[str, bytes]:
 async def run_scan_pipeline(filename: str, source_files: list) -> dict:
     scan_started = perf_counter()
     scanners = [
-        ("heuristic", scan_source_files, None),
-        ("gitleaks", scan_with_gitleaks, GitleaksScanError),
-        ("semgrep", scan_with_semgrep, SemgrepScanError),
-        ("osv", scan_with_osv, OsvScanError),
+        ("reposentinel_core", scan_with_reposentinel_core),
+        ("heuristic", scan_source_files),
+        ("gitleaks", scan_with_gitleaks),
+        ("semgrep", scan_with_semgrep),
+        ("osv", scan_with_osv),
     ]
 
-    async def run_scanner(name, scan_function, _expected_error):
+    async def run_scanner(name, scan_function):
         started = perf_counter()
         try:
             results = await asyncio.to_thread(scan_function, source_files)
@@ -352,8 +363,8 @@ async def run_scan_pipeline(filename: str, source_files: list) -> dict:
             }
 
     outcomes = await asyncio.gather(*(
-        run_scanner(name, function, expected_error)
-        for name, function, expected_error in scanners
+        run_scanner(name, function)
+        for name, function in scanners
     ))
 
     all_findings = []
@@ -380,7 +391,7 @@ async def run_scan_pipeline(filename: str, source_files: list) -> dict:
         "Review scanner_status before relying on these results."
         if failures
         else (
-            "Heuristic, Gitleaks, Semgrep, and OSV-Scanner analysis "
+            "RepoSentinel Core, Heuristic, Gitleaks, Semgrep, and OSV-Scanner analysis "
             "completed. Findings require human review."
         )
     )

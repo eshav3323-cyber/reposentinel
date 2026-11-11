@@ -103,6 +103,68 @@ def redact_evidence(text: str) -> str:
     return text[:500]
 
 
+def scanner_attributions(value: str | None) -> list[str]:
+    """Return unique, ordered scanner names from comma-separated attribution."""
+    attributions = []
+    seen = set()
+
+    for scanner in str(value or "").split(","):
+        name = scanner.strip()
+        key = name.casefold()
+        if name and key not in seen:
+            seen.add(key)
+            attributions.append(name)
+
+    return attributions
+
+
+def merge_findings(existing: Finding, candidate: Finding) -> Finding:
+    """Merge scanner attribution and complementary data for one deduplicated issue."""
+    severity_rank = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
+    confidence_rank = {"low": 1, "medium": 2, "high": 3}
+
+    if severity_rank[candidate.severity] > severity_rank[existing.severity]:
+        existing.severity = candidate.severity
+    if confidence_rank[candidate.confidence] > confidence_rank[existing.confidence]:
+        existing.confidence = candidate.confidence
+
+    existing.source_scanner = ", ".join(
+        scanner_attributions(
+            ", ".join(
+                scanner_attributions(existing.source_scanner)
+                + scanner_attributions(candidate.source_scanner)
+            )
+        )
+    )
+
+    def combine_text(first: str, second: str, placeholder: str | None = None) -> str:
+        first = redact_evidence(first)
+        second = redact_evidence(second)
+        if not first or first == placeholder:
+            return second or first
+        if not second or second == placeholder or second in first:
+            return first
+        if first in second:
+            return second
+        return f"{first}\n{second}"
+
+    existing.description = (
+        combine_text(existing.description, candidate.description, "No description provided.")
+    )
+    existing.remediation = (
+        combine_text(
+            existing.remediation,
+            candidate.remediation,
+            "Review the finding manually.",
+        )
+    )
+    existing.redacted_evidence = (
+        combine_text(existing.redacted_evidence, candidate.redacted_evidence)
+    )
+    existing.explanation = build_finding_explanation(existing)
+    return existing
+
+
 def normalize_finding(
     raw: dict[str, Any],
     *,
@@ -133,7 +195,7 @@ def normalize_finding(
         str(raw.get("title") or "Unspecified security finding")
     )[:240]
     rule_id = redact_evidence(str(raw.get("rule_id") or "UNSPECIFIED"))
-    file_path = redact_evidence(str(raw.get("file_path") or "unknown"))
+    file_path = redact_evidence(_normalize_path(raw.get("file_path") or "unknown"))
     description = redact_evidence(
         str(raw.get("description") or "No description provided.")
     )
@@ -141,6 +203,7 @@ def normalize_finding(
     remediation = redact_evidence(
         str(raw.get("remediation") or "Review the finding manually.")
     )
+    source_scanner = ", ".join(scanner_attributions(source_scanner))
 
     try:
         line_number = max(1, int(raw.get("line_number") or 1))

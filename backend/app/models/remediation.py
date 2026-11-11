@@ -22,6 +22,7 @@ class RemediationRecommendation(BaseModel):
     estimated_effort: Effort
     risk_reduction_score: int = Field(ge=0, le=100)
     score_explanation: str
+    selection_reason: str | None = None
     evidence_classification: EvidenceClassification = "observed_finding"
     covered_path_ids: list[str] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
