@@ -43,15 +43,6 @@ const FOOTER_COLUMNS = [
     ],
   },
   {
-    title: "Project",
-    links: [
-      { label: "About RepoSentinel", href: PROJECT_REPOSITORY_URL },
-      { label: "Our Mission", upcoming: true },
-      { label: "Technology Stack", upcoming: true },
-      { label: "Team", upcoming: true },
-    ],
-  },
-  {
     title: "Connect",
     links: [
       { label: "GitHub Repository", href: PROJECT_REPOSITORY_URL },
